@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <name>Content Review Jobs</name>
+    <groupId>org.sakaiproject.contentreview</groupId>
+    <artifactId>sakai-contentreview-impl-jobs</artifactId>
+    <organization>
+        <name>Sakai Project</name>
+        <url>http://www.sakaiproject.org/</url>
+    </organization>
+    <packaging>jar</packaging>
+
+    <parent>
+        <groupId>org.sakaiproject.contentreview</groupId>
+        <artifactId>content-review-impl-base</artifactId>
+        <version>11-SNAPSHOT</version>
+    </parent>
+
+    <dependencies>
+        <dependency>
+                <groupId>org.sakaiproject.contentreview</groupId>
+                <artifactId>contentreview-service-api</artifactId>
+         </dependency>
+         <dependency>
+                <groupId>org.quartz-scheduler</groupId>
+                <artifactId>quartz</artifactId>
+        </dependency>
+        <dependency>
+                <groupId>org.sakaiproject.scheduler</groupId>
+                <artifactId>scheduler-api</artifactId>
+        </dependency>
+        <dependency>
+                <groupId>org.sakaiproject.kernel</groupId>
+                <artifactId>sakai-kernel-api</artifactId>
+        </dependency>
+    </dependencies>
+    <build>
+        <resources>
+        	<resource>
+        		<directory>src/java</directory>
+        		<includes>
+        			<include>**/*.properties</include>
+        		</includes>
+        	</resource>
+        </resources>
+    </build>
+</project>

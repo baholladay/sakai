@@ -7,7 +7,7 @@
 		<version>11-SNAPSHOT</version>
 		<relativePath>../../pom.xml</relativePath>
 	</parent>
-	<name>contentreview-service-api</name>
+	<name>Content Review Api</name>
 	<groupId>org.sakaiproject.contentreview</groupId>
 	<artifactId>contentreview-service-api</artifactId>
 	<description />

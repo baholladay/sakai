@@ -10,14 +10,15 @@
 
   <groupId>org.sakaiproject.contentreview</groupId>
   <artifactId>contentreview</artifactId>
-  <name>Sakai Content Review API</name>
+  <name>Content Review</name>
   <version>11-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <modules>
     <module>content-review-api/model</module>
     <module>content-review-api/public</module>
-    <module>contentreview-federated</module>
+    <module>content-review-impl</module>
+    <module>content-review-pack</module>
   </modules>
 
 
@@ -34,6 +35,11 @@
       <dependency>
         <groupId>org.sakaiproject.contentreview</groupId>
         <artifactId>contentreview-model-api</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.sakaiproject.contentreview</groupId>
+        <artifactId>sakai-contentreview-impl-dao</artifactId>
         <version>${project.version}</version>
       </dependency>
     </dependencies>

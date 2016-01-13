@@ -1,0 +1,5 @@
+-Content Review tables should have a "key" for any impl: i.e. "vericite", "tii"...
+-Images references needs updated in TII & vericite
+-vericite & tii beans need to be lazy loaded in the federated impl
+-the federated implementation should call "processQueue()" and "checkForReports()" for all services, not just the selected ones since this is called by a cron job and doesn't have a site context
+-If we can, store TII & VeriCite in Sakai and have them easily enabled by setting a sakai.property
