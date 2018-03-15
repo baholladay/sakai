@@ -7663,9 +7663,11 @@ public class AssignmentAction extends PagedResourceActionII {
             if (useReviewService
             		&& contentReviewService != null 
             		&& "TurnitinOC".equals(contentReviewService.getServiceName())
+            		&& "false".equalsIgnoreCase((String) serverConfigurationService.getString("turnitin.option.internet_check.default", ""))
+            		&& "false".equalsIgnoreCase((String) serverConfigurationService.getString("turnitin.option.institution_check.default", ""))
             		&& !checkInstitution
             		&& !checkInternet) {
-	            	//At least one "check" option must be selected for TurnitinOC
+	            	//At least one "check" option must be selected for TurnitinOC or prop defaults must be set to true
 	            	String contentReviewNote = rb.getFormattedMessage("review.required", new String[] {contentReviewService.getServiceName()});
 	            	addAlert(state, contentReviewNote);
 	            	return;
