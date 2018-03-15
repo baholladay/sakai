@@ -7658,21 +7658,24 @@ public class AssignmentAction extends PagedResourceActionII {
                     //Numberformatexception
                 }
             }
-
+            
+            // Set if required "check" options are visible to user                        
+            boolean showInternetCheck = "true".equals(params.getString("show_NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INTERNET"));
+            boolean showInstituionCheck = "true".equals(params.getString("show_NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INSTITUTION"));
+                        
             //Check if all required content review fields are set
-            if (useReviewService
-            		&& contentReviewService != null 
-            		&& "TurnitinOC".equals(contentReviewService.getServiceName())
-            		&& "false".equalsIgnoreCase((String) serverConfigurationService.getString("turnitin.option.internet_check.default", ""))
-            		&& "false".equalsIgnoreCase((String) serverConfigurationService.getString("turnitin.option.institution_check.default", ""))
-            		&& !checkInstitution
-            		&& !checkInternet) {
-	            	//At least one "check" option must be selected for TurnitinOC or prop defaults must be set to true
+            if (useReviewService            		            		            	
+            		&& contentReviewService != null
+    				&& "TurnitinOC".equals(contentReviewService.getServiceName())
+    				//At least one "check" option must be selected for TurnitinOC 
+    				&& !checkInternet 
+    				&& !checkInstitution
+    				// If both are unchecked makes sure options were visible to user
+    				&& (showInstituionCheck || showInternetCheck)) {	            	
 	            	String contentReviewNote = rb.getFormattedMessage("review.required", new String[] {contentReviewService.getServiceName()});
 	            	addAlert(state, contentReviewNote);
 	            	return;
             }  
-
 
             // the attachments
             List attachments = (List) state.getAttribute(NEW_ASSIGNMENT_ATTACHMENT);
