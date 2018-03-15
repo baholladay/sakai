@@ -35,10 +35,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
-import org.sakaiproject.assignment.api.AssignmentConstants;
 import org.sakaiproject.assignment.api.AssignmentService;
 import org.sakaiproject.assignment.api.model.Assignment;
 import org.sakaiproject.authz.api.SecurityService;
@@ -114,8 +112,6 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	private static final String HEADER_AUTH = "Authorization";
 	private static final String HEADER_CONTENT = "Content-Type";
 	private static final String HEADER_DISP = "Content-Disposition";
-	
-	private static final String HTML_EXTENSION = ".html";
 
 	private static final String STATUS_CREATED = "CREATED";
 	private static final String STATUS_COMPLETE = "COMPLETE";
@@ -129,7 +125,6 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 	private String serviceUrl;
 	private String apiKey;
-	private String sakaiVersion;
 
 	private HashMap<String, String> BASE_HEADERS = new HashMap<String, String>();
 	private HashMap<String, String> SUBMISSION_REQUEST_HEADERS = new HashMap<String, String>();
@@ -140,12 +135,10 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		// Retrieve Service URL and API key
 		serviceUrl = serverConfigurationService.getString("turnitin.oc.serviceUrl", "");
 		apiKey = serverConfigurationService.getString("turnitin.oc.apiKey", "");
-		// Retrieve Sakai Version if null set default 		
-		sakaiVersion = Optional.ofNullable(serverConfigurationService.getString("version.sakai", "")).orElse("UNKNOWN");		
 
 		// Populate base headers that are needed for all calls to TCA
 		BASE_HEADERS.put(HEADER_NAME, INTEGRATION_FAMILY);
-		BASE_HEADERS.put(HEADER_VERSION, sakaiVersion);
+		BASE_HEADERS.put(HEADER_VERSION, INTEGRATION_VERSION);
 		BASE_HEADERS.put(HEADER_AUTH, "Bearer " + apiKey);
 
 		// Populate submission request headers used in getSubmissionId
@@ -235,22 +228,44 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			throws QueueException, SubmissionException, ReportException {
 		return null;
 	}
+
+	public String getReviewReport(String contentId, String assignmentRef, String userId)
+			throws QueueException, ReportException {
+		return getViewerUrl(contentId, userId);
+	}
+
+	public String getReviewReportInstructor(String contentId, String assignmentRef, String userId)
+			throws QueueException, ReportException {
+		/**
+		 * contentId:
+		 * /attachment/04bad844-493c-45a1-95b4-af70129d54d1/Assignments/b9872422-fb24-4f85-abf5-2fe0e069b251/plag.docx
+		 */
+		log.info("GET REVIEW REPORT INSTRUCTOR");
+		log.info(contentId);
+		log.info(userId);
+		return getViewerUrl(contentId, userId);
+	}
+
+	public String getReviewReportStudent(String contentId, String assignmentRef, String userId)
+			throws QueueException, ReportException {
+		return getViewerUrl(contentId, userId);
+	}
 	
-	public String getReviewReportRedirectUrl(String contentId, String assignmentRef, String userId, boolean isInstructor) {
+	private String getViewerUrl(String contentId, String viewUserId) throws QueueException, ReportException {
 		
 		// Set variables
 		String viewerUrl = null;
 		Optional<ContentReviewItem> optionalItem = crqs.getQueuedItem(getProviderId(), contentId);
 		ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
-		if(item != null && ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_REPORT_AVAILABLE_CODE.equals(item.getStatus())) {
+		if (item != null && ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_REPORT_AVAILABLE_CODE.equals(item.getStatus())) {
 			try {
 				//Get report owner user information
 				String givenName = "", familyName = "";
-				try{
+				try {
 					User user = userDirectoryService.getUser(item.getUserId());
 					givenName = user.getFirstName();
 					familyName = user.getLastName();
-				}catch (Exception e) {
+				} catch (Exception e) {
 					log.error(e.getMessage(), e);
 				}
 				Map<String, Object> data = new HashMap<String, Object>();
@@ -260,7 +275,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 				// Check user preference for locale			
 				// If user has no preference set - get the system default
-				Locale locale = Optional.ofNullable(preferencesService.getLocale(userId))
+				Locale locale = Optional.ofNullable(preferencesService.getLocale(viewUserId))
 						.orElse(Locale.getDefault());
 
 				// Set locale, getLanguage removes locale region
@@ -293,12 +308,12 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			} catch (Exception e) {
 				log.error(e.getLocalizedMessage(), e);
 			}
-		}else {
+		} else {
 			// Only generate viewerUrl if report is available
 			log.info("Content review item is not ready for the report: " + contentId + ", " + (item != null ? item.getStatus() : ""));
 		}
 	
-		return viewerUrl;
+		throw new ReportException("Cannot return viewer url - report is incomplete or contains an error");
 	}
 
 
@@ -479,7 +494,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 					return responseJSON.getInt("overall_match_percentage");
 				} else {
 					log.error("Report came back as complete, but without a score");
-					return -2;
+					return -3;
 				}
 
 			} else if (responseJSON.containsKey("status")
@@ -488,11 +503,11 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				return -1;
 			} else {
 				log.error("Something went wrong in the similarity report process: reportId " + reportId);
-				return -2;
+				return -3;
 			}
 		} else {
 			log.error("Submission status call failed: " + responseMessage);
-			return -2;
+			return -3;
 		}
 	}
 
@@ -608,7 +623,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				} else if (status == -1) {
 					// Similarity report is still generating, will try again
 					log.info("Processing report " + item.getExternalId() + "...");
-				} else if(status == -2){
+				} else if(status == - 3){
 					throw new Error("Unknown error during report status call");
 				}
 			} catch (Exception e) {
@@ -666,27 +681,23 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				errors++;
 				continue;
 			}
+			// Get filename of submission
+			String fileName = resource.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME);
+			if (StringUtils.isEmpty(fileName)) {
+				// Set default file name:
+				fileName = "submission_" + item.getUserId() + "_" + item.getSiteId();
+				log.info("Using Default Filename " + fileName);
+			}
 			// EXTERNAL ID DOES NOT EXIST, CREATE SUBMISSION AND UPLOAD CONTENTS TO TCA
 			// (STAGE 1)
 			if (StringUtils.isEmpty(item.getExternalId())) {
-				// Get filename of submission						
-				String fileName = resource.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME);						
-				// If fileName is empty set default
-				if (StringUtils.isEmpty(fileName)) {
-					fileName = "submission_" + item.getUserId() + "_" + item.getSiteId();
-					log.info("Using Default Filename " + fileName);
-				}				
-				// Add .html for inline submissions				
-				if ("true".equals(resource.getProperties().getProperty(AssignmentConstants.PROP_INLINE_SUBMISSION))
-						&& FilenameUtils.getExtension(fileName).isEmpty()) {
-					fileName += HTML_EXTENSION;
-				}							
 				try {
 					log.info("Submission starting...");
 					// Retrieve submissionId from TCA and set to externalId
 					String externalId = getSubmissionId(item.getUserId(), fileName);
 					if (StringUtils.isEmpty(externalId)) {
 						throw new Error("submission id is missing");
+
 					} else {
 						// Add filename to content upload headers
 						CONTENT_UPLOAD_HEADERS.put(HEADER_DISP, "inline; filename=\"" + fileName + "\"");
@@ -744,20 +755,28 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						continue;
 					case "UNSUPPORTED_FILETYPE":
 						errorStr = "The uploaded filetype is not supported";
+						break;
 					case "PROCESSING_ERROR":
 						errorStr = "An unspecified error occurred while processing the submissions";
+						break;
 					case "TOO_LITTLE_TEXT":
 						errorStr = "The submission does not have enough text to generate a Similarity Report (a submission must contain at least 20 words)";
+						break;
 					case "TOO_MUCH_TEXT":
 						errorStr = "The submission has too much text to generate a Similarity Report (after extracted text is converted to UTF-8, the submission must contain less than 2MB of text)";
+						break;
 					case "TOO_MANY_PAGES":
 						errorStr = "The submission has too many pages to generate a Similarity Report (a submission cannot contain more than 400 pages)";
+						break;
 					case "FILE_LOCKED":
 						errorStr = "The uploaded file requires a password in order to be opened";
+						break;
 					case "CORRUPT_FILE":
 						errorStr = "The uploaded file appears to be corrupt";
+						break;
 					case "ERROR":				
 						errorStr = "Submission returned with ERROR status";
+						break;
 					default:
 						log.info("Unknown submission status, will retry: " + submissionStatus);
 					}
