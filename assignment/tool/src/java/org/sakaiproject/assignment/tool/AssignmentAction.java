@@ -6814,6 +6814,24 @@ public class AssignmentAction extends PagedResourceActionII {
         } else {
             state.setAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_VALUE, "1");
         }
+                
+        //Check if all required content review fields are set
+        boolean useReviewService = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE));
+        boolean checkInternet = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INTERNET));
+        boolean checkInstitution = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INSTITUTION));
+        boolean showInternetCheck = "true".equals(params.getString("show_NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INTERNET"));
+        boolean showInstituionCheck = "true".equals(params.getString("show_NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INSTITUTION"));
+        if (useReviewService            		            		            	
+        		&& contentReviewService != null
+				&& Arrays.asList("TurnitinOC").contains(contentReviewService.getServiceName())
+				//At least one "check" option must be selected for TurnitinOC 
+				&& !checkInternet 
+				&& !checkInstitution
+				// If both are unchecked make sure options were visible to user
+				&& (showInstituionCheck || showInternetCheck)) {	            	
+            	String contentReviewNote = rb.getFormattedMessage("review.required", new String[] {contentReviewService.getServiceName()});
+            	addAlert(state, contentReviewNote);
+        }
 
         // treat the new assignment description as formatted text
         boolean checkForFormattingErrors = true; // instructor is creating a new assignment - so check for errors
@@ -7658,19 +7676,6 @@ public class AssignmentAction extends PagedResourceActionII {
                     //Numberformatexception
                 }
             }
-
-            //Check if all required content review fields are set
-            if (useReviewService
-            		&& contentReviewService != null 
-            		&& "TurnitinOC".equals(contentReviewService.getServiceName())
-            		&& !checkInstitution
-            		&& !checkInternet) {
-	            	//At least one "check" option must be selected for TurnitinOC
-	            	String contentReviewNote = rb.getFormattedMessage("review.required", new String[] {contentReviewService.getServiceName()});
-	            	addAlert(state, contentReviewNote);
-	            	return;
-            }  
-
 
             // the attachments
             List attachments = (List) state.getAttribute(NEW_ASSIGNMENT_ATTACHMENT);
