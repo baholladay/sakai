@@ -159,6 +159,80 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		// Populate content upload headers used in uploadExternalContent
 		CONTENT_UPLOAD_HEADERS.putAll(BASE_HEADERS);
 		CONTENT_UPLOAD_HEADERS.put(HEADER_CONTENT, CONTENT_TYPE_BINARY);
+		
+		// String id = setupWebhook();
+		// getWebhook(id);
+	}
+	
+	public String setupWebhook() {
+		String id = "";
+		
+		Map<String, Object> data = new HashMap<String, Object>();
+		
+		List<String> types = new ArrayList<>();
+		types.add("SIMILARITY_COMPLETE");
+		types.add("SUBMISSION_COMPLETE");
+
+		data.put("signing_secret", apiKey);
+		data.put("url", "https://www.fakeurl.com");
+		data.put("description", "test");
+		data.put("allow-insecure", false);
+		data.put("event-types", types);
+
+		try {
+			HashMap<String, Object> response = makeHttpCall("POST",
+				getNormalizedServiceUrl() + "webhooks",
+				SUBMISSION_REQUEST_HEADERS,
+				data,
+				null);
+
+			// Get response:
+			int responseCode = !response.containsKey(RESPONSE_CODE) ? 0 : (int) response.get(RESPONSE_CODE);
+			String responseMessage = !response.containsKey(RESPONSE_MESSAGE) ? "" : (String) response.get(RESPONSE_MESSAGE);
+			String responseBody = !response.containsKey(RESPONSE_BODY) ? "" : (String) response.get(RESPONSE_BODY);
+
+			if ((responseCode >= 200) && (responseCode < 300) && (responseBody != null)) {
+				// create JSONObject from responseBody
+				JSONObject responseJSON = JSONObject.fromObject(responseBody);
+				if (responseJSON.containsKey("id")) {
+					id = responseJSON.getString("id");
+				} else {
+					throw new Error("Viewer URL not found. Response: " + responseMessage);
+				}
+			} else {
+				throw new Error(responseMessage);
+			}
+		} catch (IOException e) {
+			log.error("Connection issue, cannot fetch webhooks");
+		}
+
+		return id;
+	}
+	
+	public void getWebhook(String id) {
+		try {
+			HashMap<String, Object> response = makeHttpCall("GET",
+				getNormalizedServiceUrl() + "webhooks/" + id,
+				SUBMISSION_REQUEST_HEADERS,
+				null,
+				null);
+			
+			// Get response:
+			int responseCode = !response.containsKey(RESPONSE_CODE) ? 0 : (int) response.get(RESPONSE_CODE);
+			String responseMessage = !response.containsKey(RESPONSE_MESSAGE) ? "" : (String) response.get(RESPONSE_MESSAGE);
+			String responseBody = !response.containsKey(RESPONSE_BODY) ? "" : (String) response.get(RESPONSE_BODY);
+
+			if ((responseCode >= 200) && (responseCode < 300) && (responseBody != null)) {
+				// create JSONObject from responseBody
+				JSONObject responseJSON = JSONObject.fromObject(responseBody);
+				
+			} else {
+				throw new Error(responseMessage);
+			}
+		} catch (IOException e) {
+			log.error("Connection issue, cannot fetch webhooks");
+		}
+		
 	}
 
 	public boolean allowResubmission() {
