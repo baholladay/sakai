@@ -86,7 +86,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 	@Setter
 	private SecurityService securityService;
-	
+
 	@Setter
 	private AssignmentService assignmentService;
 
@@ -98,7 +98,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 	@Setter
 	private ContentHostingService contentHostingService;
-	
+
 	@Setter
 	private SessionManager sessionManager;
 
@@ -115,19 +115,19 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	private static final String HEADER_AUTH = "Authorization";
 	private static final String HEADER_CONTENT = "Content-Type";
 	private static final String HEADER_DISP = "Content-Disposition";
-	
+
 	private static final String HTML_EXTENSION = ".html";
 
 	private static final String STATUS_CREATED = "CREATED";
 	private static final String STATUS_COMPLETE = "COMPLETE";
 	private static final String STATUS_PROCESSING = "PROCESSING";
-	
+
 	private static final String RESPONSE_CODE = "responseCode";
 	private static final String RESPONSE_MESSAGE = "responseMessage";
 	private static final String RESPONSE_BODY = "responseBody";
 	private static final String GIVEN_NAME = "given_name";
 	private static final String FAMILY_NAME = "family_name";
-	
+
 	private static final String GENERATE_REPORTS_IMMEDIATELY_AND_ON_DUE_DATE= "1";
 	private static final String GENERATE_REPORTS_ON_DUE_DATE = "2";	
 	private static final String PLACEHOLDER_STRING_FLAG = "_placeholder";
@@ -165,6 +165,77 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		// Populate content upload headers used in uploadExternalContent
 		CONTENT_UPLOAD_HEADERS.putAll(BASE_HEADERS);
 		CONTENT_UPLOAD_HEADERS.put(HEADER_CONTENT, CONTENT_TYPE_BINARY);
+
+		try {
+			String webhookUrl = getWebhookUrl(Optional.empty());
+			if (!webhookUrl.contains("localhost")) {
+				webhookId = setupWebhook(webhookUrl);
+				getWebhook(webhookId);
+			} else {
+				log.info("Running locally - ignoring webhook calls");
+			}
+		} catch (Exception e) {
+			log.error(e.getLocalizedMessage());
+		}
+	}
+
+	public String setupWebhook(String webhookUrl) throws IOException {
+		String id = "";
+
+		Map<String, Object> data = new HashMap<String, Object>();
+
+		List<String> types = new ArrayList<>();
+		types.add("SIMILARITY_COMPLETE");
+		types.add("SUBMISSION_COMPLETE");
+
+		data.put("signing_secret", apiKey);
+		data.put("url", webhookUrl);
+		data.put("description", "test");
+		data.put("allow-insecure", false);
+		data.put("event-types", types);
+
+		HashMap<String, Object> response = makeHttpCall("POST",
+				getNormalizedServiceUrl() + "webhooks",
+				SUBMISSION_REQUEST_HEADERS,
+				data,
+				null);
+
+		// Get response:
+		int responseCode = !response.containsKey(RESPONSE_CODE) ? 0 : (int) response.get(RESPONSE_CODE);
+		String responseMessage = !response.containsKey(RESPONSE_MESSAGE) ? "" : (String) response.get(RESPONSE_MESSAGE);
+		String responseBody = !response.containsKey(RESPONSE_BODY) ? "" : (String) response.get(RESPONSE_BODY);
+
+		if ((responseCode >= 200) && (responseCode < 300) && (responseBody != null)) {
+			// create JSONObject from responseBody
+			JSONObject responseJSON = JSONObject.fromObject(responseBody);
+			if (responseJSON.containsKey("id")) {
+				id = responseJSON.getString("id");
+			} else {
+				throw new Error("Viewer URL not found. Response: " + responseMessage);
+			}
+		} else {
+			throw new Error(responseMessage);
+		}
+
+		return id;
+	}
+
+	public void getWebhook(String id) throws IOException {
+		HashMap<String, Object> response = makeHttpCall("GET",
+				getNormalizedServiceUrl() + "webhooks/" + id,
+				SUBMISSION_REQUEST_HEADERS,
+				null,
+				null);
+
+		// Get response:
+		int responseCode = !response.containsKey(RESPONSE_CODE) ? 0 : (int) response.get(RESPONSE_CODE);
+		String responseMessage = !response.containsKey(RESPONSE_MESSAGE) ? "" : (String) response.get(RESPONSE_MESSAGE);
+		String responseBody = !response.containsKey(RESPONSE_BODY) ? "" : (String) response.get(RESPONSE_BODY);
+
+		if ((responseCode < 200) || (responseCode >= 300) || (responseBody == null)) {
+			throw new Error(responseMessage);
+		}
+
 	}
 
 	public boolean allowResubmission() {
@@ -241,9 +312,9 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			throws QueueException, SubmissionException, ReportException {
 		return null;
 	}
-	
+
 	public String getReviewReportRedirectUrl(String contentId, String assignmentRef, String userId, boolean isInstructor) {
-		
+
 		// Set variables
 		String viewerUrl = null;
 		Optional<ContentReviewItem> optionalItem = crqs.getQueuedItem(getProviderId(), contentId);
@@ -303,7 +374,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			// Only generate viewerUrl if report is available
 			log.info("Content review item is not ready for the report: " + contentId + ", " + (item != null ? item.getStatus() : ""));
 		}
-	
+
 		return viewerUrl;
 	}
 
@@ -329,9 +400,9 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	public boolean isSiteAcceptable(Site arg0) {
 		return true;
 	}
-	
+
 	private HashMap<String, Object> makeHttpCall(String method, String urlStr, Map<String, String> headers,  Map<String, Object> data, byte[] dataBytes) 
-		throws IOException {
+			throws IOException {
 		// Set variables
 		HttpURLConnection connection = null;
 		DataOutputStream wr = null;
@@ -373,20 +444,20 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		int responseCode = connection.getResponseCode();
 		String responseMessage = connection.getResponseMessage();
 		String responseBody = IOUtils.toString(connection.getInputStream(), StandardCharsets.UTF_8);
-		
+
 		HashMap<String, Object> response = new HashMap<String, Object>();
 		response.put(RESPONSE_CODE, responseCode);
 		response.put(RESPONSE_MESSAGE, responseMessage);
 		response.put(RESPONSE_BODY, responseBody);
-		
+
 		return response;
 	}
 
 	private void generateSimilarityReport(String reportId, String assignmentRef) throws Exception {
-		
+
 		Assignment assignment = assignmentService.getAssignment(entityManager.newReference(assignmentRef));
 		Map<String, String> assignmentSettings = assignment.getProperties();
-		
+
 		List<String> repositories = new ArrayList<>();
 		if ("true".equals(assignmentSettings.get("internet_check"))) {
 			repositories.add("INTERNET");
@@ -397,7 +468,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		if ("true".equals(assignmentSettings.get("journal_check"))) {
 			repositories.add("JOURNAL");
 		}
-		
+
 		if (repositories.size() == 0) {
 			throw new Error("Cannot generate similarity report - at least one search repo must be selected");
 		}
@@ -412,18 +483,18 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		viewSettings.put("exclude_quotes", "true".equals(assignmentSettings.get("exclude_quoted")));
 		viewSettings.put("exclude_bibliography", "true".equals(assignmentSettings.get("exclude_biblio")));
 		reportData.put("view_settings", viewSettings);
-		
+
 		HashMap<String, Object> response = makeHttpCall("PUT",
-			getNormalizedServiceUrl() + "submissions/" + reportId + "/similarity",
-			SIMILARITY_REPORT_HEADERS,
-			reportData,
-			null);
-		
+				getNormalizedServiceUrl() + "submissions/" + reportId + "/similarity",
+				SIMILARITY_REPORT_HEADERS,
+				reportData,
+				null);
+
 		// Get response:
 		int responseCode = !response.containsKey(RESPONSE_CODE) ? 0 : (int) response.get(RESPONSE_CODE);
 		String responseMessage = !response.containsKey(RESPONSE_MESSAGE) ? "" : (String) response.get(RESPONSE_MESSAGE);
 		String responseBody = !response.containsKey(RESPONSE_BODY) ? "" : (String) response.get(RESPONSE_BODY);
-		
+
 		if ((responseCode >= 200) && (responseCode < 300)) {
 			log.debug("Successfully initiated Similarity Report generation.");
 		} else if ((responseCode == 409)) {
@@ -577,7 +648,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			log.error(e.getMessage(), e);
 		}
 	}
-	
+
 	public void checkForReport() {
 		// Original file has been uploaded, and similarity report has been requested
 		// Check for status of report and return score
@@ -676,7 +747,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		}
 		log.info("Turnitin report queue run completed: " + success + " items submitted, " + errors + " errors.");		
 	}
-	
+
 	public void processUnsubmitted() {
 		// Submission process phase 1
 		// 1. Establish submission object, get ID
@@ -875,7 +946,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		}		
 		log.info("Turnitin submission queue completed: " + success + " items submitted, " + errors + " errors.");		
 	}
-	
+
 	private Date getDueDateRetryTime(Date dueDate) {
 		// Set retry time to every 4 hours
 		Calendar cal = Calendar.getInstance();
@@ -908,7 +979,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		placeholderItem.setTaskId(item.getTaskId());																	
 		crqs.update(placeholderItem);
 	}			
-	
+
 	public boolean incrementItem(ContentReviewItem item) {
 		// If retry count is null set to 0
 		Calendar cal = Calendar.getInstance();
@@ -936,7 +1007,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	public int getDelayTime(long retries) {
 		// exponential retry algorithm that caps the retries off at 36 hours (checking once every 4 hours max)
 		int minutes = (int) Math.pow(2, retries < TURNITIN_MAX_RETRY ? retries : 1); // built in check for max retries
-																						// to fail quicker
+		// to fail quicker
 		return minutes > TURNITIN_OC_MAX_RETRY_MINUTES ? TURNITIN_OC_MAX_RETRY_MINUTES : minutes;
 	}
 
@@ -975,7 +1046,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	}
 
 	private void uploadExternalContent(String reportId, byte[] data) throws Exception {
-		
+
 		HashMap<String, Object> response = makeHttpCall("PUT",
 				getNormalizedServiceUrl() + "submissions/" + reportId + "/original/",
 				CONTENT_UPLOAD_HEADERS,
@@ -996,7 +1067,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		Optional<ContentReviewItem> cri = crqs.getQueuedItem(getProviderId(), contentId);
 		return cri.isPresent() ? cri.get() : null;
 	}
-	
+
 	@Override
 	public String getEndUserLicenseAgreementLink() {
 		return "https://www.vericite.com";
@@ -1011,7 +1082,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	public String getEndUserLicenseAgreementVersion() {
 		return "1.1";
 	}
-	
+
 	@Override
 	public void webhookEvent(HttpServletRequest request, String providerName, Optional<String> customParam) {
 		log.info("providerName: " + providerName + ", custom: " + (customParam.isPresent() ? customParam.get() : ""));
