@@ -136,6 +136,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	private String serviceUrl;
 	private String apiKey;
 	private String sakaiVersion;
+	private String webhookId;
 
 	private HashMap<String, String> BASE_HEADERS = new HashMap<String, String>();
 	private HashMap<String, String> SUBMISSION_REQUEST_HEADERS = new HashMap<String, String>();
