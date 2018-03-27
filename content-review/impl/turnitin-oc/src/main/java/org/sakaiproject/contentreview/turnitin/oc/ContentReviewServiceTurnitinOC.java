@@ -46,6 +46,7 @@ import org.apache.commons.lang.StringUtils;
 import org.sakaiproject.assignment.api.AssignmentConstants;
 import org.sakaiproject.assignment.api.AssignmentService;
 import org.sakaiproject.assignment.api.model.Assignment;
+import org.sakaiproject.assignment.api.model.AssignmentSubmission;
 import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.content.api.ContentHostingService;
 import org.sakaiproject.content.api.ContentResource;
@@ -382,7 +383,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		return response;
 	}
 
-	private void generateSimilarityReport(String reportId, String assignmentRef) throws Exception {
+	private void generateSimilarityReport(String reportId, String assignmentRef, boolean isFinalSubmission) throws Exception {
 		
 		Assignment assignment = assignmentService.getAssignment(entityManager.newReference(assignmentRef));
 		Map<String, String> assignmentSettings = assignment.getProperties();
@@ -412,6 +413,11 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		viewSettings.put("exclude_quotes", "true".equals(assignmentSettings.get("exclude_quoted")));
 		viewSettings.put("exclude_bibliography", "true".equals(assignmentSettings.get("exclude_biblio")));
 		reportData.put("view_settings", viewSettings);
+		
+		Map<String, Object> indexingSettings = new HashMap<String, Object>();
+		//Drafts are not added to index to avoid self plagiarism 
+		indexingSettings.put("add_to_index", "true".equals(String.valueOf(isFinalSubmission)));
+		reportData.put("indexing_settings", indexingSettings);
 		
 		HashMap<String, Object> response = makeHttpCall("PUT",
 			getNormalizedServiceUrl() + "submissions/" + reportId + "/similarity",
@@ -603,7 +609,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						// Make sure due date is past						
 						if (assignmentDueDate.before(new Date())) {
 							// Regenerate similarity request 
-							generateSimilarityReport(item.getExternalId(), item.getTaskId());
+							// Due Date is past, eliminates need for draft check 
+							generateSimilarityReport(item.getExternalId(), item.getTaskId(), true);
 							//Lookup reference item
 							String referenceItemContentId = item.getContentId().substring(0, item.getContentId().indexOf(PLACEHOLDER_STRING_FLAG));							
 							Optional<ContentReviewItem> quededReferenceItem = crqs.getQueuedItem(item.getProviderId(), referenceItemContentId);
@@ -685,15 +692,15 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		int errors = 0;
 		int success = 0;
 		Optional<ContentReviewItem> nextItem = null;
-
+		
 		while ((nextItem = crqs.getNextItemInQueueToSubmit(getProviderId())).isPresent()) {
 			try {
 				ContentReviewItem item = nextItem.get();
 				if (!incrementItem(item)) {
 					errors++;
 					continue;
-				}						
-				// Handle items that only generate reports on due date				
+				}
+				// Handle items that only generate reports on due date
 				// Get assignment associated with current item's task Id
 				Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
 				Date assignmentDueDate = null;
@@ -800,7 +807,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						switch (submissionStatus) {
 						case "COMPLETE":
 							// If submission status is complete, start similarity report process
-							generateSimilarityReport(item.getExternalId(), item.getTaskId());
+							generateSimilarityReport(item.getExternalId(), item.getTaskId(), checkForDraft(item, assignment));
 							// Update item status for loop 2
 							item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
 							// Reset retry count
@@ -886,6 +893,21 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			cal.add(Calendar.MINUTE, 5);
 		}
 		return cal.getTime();
+	}
+	
+	private Boolean checkForDraft(ContentReviewItem item, Assignment assignment) {
+		// Checks if current item is a draft
+		try {
+			User userId = userDirectoryService.getUser(item.getUserId());				
+			String assignmentId = assignment.getId();
+			AssignmentSubmission currentSubmission = assignmentService.getSubmission(assignmentId, userId);
+			// Drafts return false, final submissions return true, if null return true			
+			return Optional.ofNullable(currentSubmission.getSubmitted()).orElse(true);  	
+		} catch (Exception e) {				
+			log.error(e.getMessage(), e);
+			// Error retrieving draft, process item as final submission
+			return true;
+		}		
 	}
 
 	private void createPlaceholderItem(ContentReviewItem item, Date dueDate) {
