@@ -48,7 +48,9 @@ public interface ContentReviewQueueService {
 	 * @throws QueueException
 	 * @throws ReportException
 	 * @throws Exception
+	 * @deprecated Use getQueuedItem method to get ContentReviewItem object
 	 */
+	@Deprecated
 	int getReviewScore(Integer providerId, String contentId)
 			throws QueueException, ReportException, Exception;
 
@@ -58,7 +60,9 @@ public interface ContentReviewQueueService {
 	 * @param contentId the id of the content item
 	 * @return a {@code java.lang.Long}
 	 * @throws QueueException
+	 * @deprecated Use getQueuedItem method to get ContentReviewItem object
 	 */
+	@Deprecated
 	Long getReviewStatus(Integer providerId, String contentId) throws QueueException;
 
 	/**
@@ -67,7 +71,9 @@ public interface ContentReviewQueueService {
 	 * @param contentId the id of the content item
 	 * @return a {@code java.util.Date}
 	 * @throws QueueException
+	 * @deprecated Use getQueuedItem method to get ContentReviewItem object
 	 */
+	@Deprecated
 	Date getDateQueued(Integer providerId, String contentId) throws QueueException;
 
 	/**
@@ -77,7 +83,9 @@ public interface ContentReviewQueueService {
 	 * @return the {@code java.util.Date}
 	 * @throws QueueException
 	 * @throws SubmissionException
+	 * @deprecated Use getQueuedItem method to get ContentReviewItem object
 	 */
+	@Deprecated
 	Date getDateSubmitted(Integer providerId, String contentId) throws QueueException, SubmissionException;
 
 	/**

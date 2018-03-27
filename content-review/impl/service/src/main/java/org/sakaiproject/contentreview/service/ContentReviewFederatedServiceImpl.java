@@ -15,6 +15,7 @@
  */
 package org.sakaiproject.contentreview.service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -45,7 +46,7 @@ import lombok.Setter;
  * by default unless overridden by a site property.
  */
 @Slf4j
-public class ContentReviewFederatedServiceImpl implements ContentReviewService {
+public class ContentReviewFederatedServiceImpl extends BaseContentReviewService {
 
 	@Setter
 	private ServerConfigurationService serverConfigurationService;
@@ -260,6 +261,36 @@ public class ContentReviewFederatedServiceImpl implements ContentReviewService {
 
 	public ContentReviewItem getContentReviewItemByContentId(String arg0) {
 		return getSelectedProvider().getContentReviewItemByContentId(arg0);
+	}
+
+	@Override
+	public String getEndUserLicenseAgreementLink() {
+		return getSelectedProvider().getEndUserLicenseAgreementLink();
+	}
+
+	@Override
+	public Instant getEndUserLicenseAgreementTimestamp() {
+		return getSelectedProvider().getEndUserLicenseAgreementTimestamp();
+	}
+
+	@Override
+	public Instant getUserEULATimestamp(String userId) {
+		return getSelectedProvider().getUserEULATimestamp(userId);
+	}
+
+	@Override
+	public void updateUserEULATimestamp(String userId) {
+		getSelectedProvider().updateUserEULATimestamp(userId);
+	}
+
+	@Override
+	public String getEndUserLicenseAgreementVersion() {
+		return getSelectedProvider().getEndUserLicenseAgreementVersion();
+	}
+	
+	@Override
+	public String getReviewReportRedirectUrl(String contentId, String assignmentRef, String userId, boolean isInstructor) {
+		return getSelectedProvider().getReviewReportRedirectUrl(contentId, assignmentRef, userId, isInstructor);
 	}
 
 }
