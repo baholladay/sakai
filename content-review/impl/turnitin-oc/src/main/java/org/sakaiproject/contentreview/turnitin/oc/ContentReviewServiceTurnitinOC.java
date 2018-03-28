@@ -383,7 +383,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		return response;
 	}
 
-	private void generateSimilarityReport(String reportId, String assignmentRef, boolean isFinalSubmission) throws Exception {
+	private void generateSimilarityReport(String reportId, String assignmentRef, boolean isDraft) throws Exception {
 		
 		Assignment assignment = assignmentService.getAssignment(entityManager.newReference(assignmentRef));
 		Map<String, String> assignmentSettings = assignment.getProperties();
@@ -416,7 +416,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		
 		Map<String, Object> indexingSettings = new HashMap<String, Object>();
 		//Drafts are not added to index to avoid self plagiarism 
-		indexingSettings.put("add_to_index", isFinalSubmission);
+		indexingSettings.put("add_to_index", !isDraft);
 		reportData.put("indexing_settings", indexingSettings);
 		
 		HashMap<String, Object> response = makeHttpCall("PUT",
@@ -692,15 +692,15 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		int errors = 0;
 		int success = 0;
 		Optional<ContentReviewItem> nextItem = null;
-		
+
 		while ((nextItem = crqs.getNextItemInQueueToSubmit(getProviderId())).isPresent()) {
 			try {
 				ContentReviewItem item = nextItem.get();
 				if (!incrementItem(item)) {
 					errors++;
 					continue;
-				}
-				// Handle items that only generate reports on due date
+				}						
+				// Handle items that only generate reports on due date				
 				// Get assignment associated with current item's task Id
 				Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
 				Date assignmentDueDate = null;
@@ -941,15 +941,15 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	}
 	
 	private boolean checkForDraft(ContentReviewItem item, Assignment assignment) {
-		// Checks if current item is a draft
+		// Checks if current item is a draft or submitted
 		try {
 			AssignmentSubmission currentSubmission = assignmentService.getSubmission(assignment.getId(), item.getUserId());		
-			// Drafts return false, final submissions return true, if null return true			
-			return Optional.ofNullable(currentSubmission.getSubmitted()).orElse(true);  	
+			// Drafts return true, final submissions return false, if null return false			
+			return Optional.ofNullable(!currentSubmission.getSubmitted()).orElse(false);  	
 		} catch (Exception e) {				
 			log.error(e.getMessage(), e);
 			// Error retrieving draft, process item as final submission
-			return true;
+			return false;
 		}		
 	}
 
