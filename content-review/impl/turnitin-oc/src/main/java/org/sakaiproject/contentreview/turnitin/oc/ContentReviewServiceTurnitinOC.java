@@ -416,7 +416,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		
 		Map<String, Object> indexingSettings = new HashMap<String, Object>();
 		//Drafts are not added to index to avoid self plagiarism 
-		indexingSettings.put("add_to_index", "true".equals(String.valueOf(isFinalSubmission)));
+		indexingSettings.put("add_to_index", isFinalSubmission);
 		reportData.put("indexing_settings", indexingSettings);
 		
 		HashMap<String, Object> response = makeHttpCall("PUT",
@@ -609,7 +609,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						// Make sure due date is past						
 						if (assignmentDueDate.before(new Date())) {
 							// Regenerate similarity request 
-							// Due Date is past, eliminates need for draft check 
+							// Report is recalled after due date, no need to check for draft 
 							generateSimilarityReport(item.getExternalId(), item.getTaskId(), true);
 							//Lookup reference item
 							String referenceItemContentId = item.getContentId().substring(0, item.getContentId().indexOf(PLACEHOLDER_STRING_FLAG));							
@@ -894,21 +894,6 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		}
 		return cal.getTime();
 	}
-	
-	private Boolean checkForDraft(ContentReviewItem item, Assignment assignment) {
-		// Checks if current item is a draft
-		try {
-			User userId = userDirectoryService.getUser(item.getUserId());				
-			String assignmentId = assignment.getId();
-			AssignmentSubmission currentSubmission = assignmentService.getSubmission(assignmentId, userId);
-			// Drafts return false, final submissions return true, if null return true			
-			return Optional.ofNullable(currentSubmission.getSubmitted()).orElse(true);  	
-		} catch (Exception e) {				
-			log.error(e.getMessage(), e);
-			// Error retrieving draft, process item as final submission
-			return true;
-		}		
-	}
 
 	private void createPlaceholderItem(ContentReviewItem item, Date dueDate) {
 		log.info("Creating placeholder item for when due date is passed for ItemID: " + item.getId());						
@@ -953,6 +938,19 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			crqs.update(item);
 		}
 		return true;
+	}
+	
+	private boolean checkForDraft(ContentReviewItem item, Assignment assignment) {
+		// Checks if current item is a draft
+		try {
+			AssignmentSubmission currentSubmission = assignmentService.getSubmission(assignment.getId(), item.getUserId());		
+			// Drafts return false, final submissions return true, if null return true			
+			return Optional.ofNullable(currentSubmission.getSubmitted()).orElse(true);  	
+		} catch (Exception e) {				
+			log.error(e.getMessage(), e);
+			// Error retrieving draft, process item as final submission
+			return true;
+		}		
 	}
 
 	public int getDelayTime(long retries) {
