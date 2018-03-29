@@ -106,7 +106,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	@Setter
 	private SessionManager sessionManager;
 
-	private static final String SERVICE_NAME = "TurnitinOC";
+	private static final String SERVICE_NAME = "Turnitin Originality Check";
 	private static final String TURNITIN_OC_API_VERSION = "v1";
 	private static final int TURNITIN_OC_MAX_RETRY_MINUTES = 240; // 4 hours
 	private static final int TURNITIN_MAX_RETRY = 16;
@@ -363,15 +363,15 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		String viewerUrl = null;
 		Optional<ContentReviewItem> optionalItem = crqs.getQueuedItem(getProviderId(), contentId);
 		ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
-		if(item != null && ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_REPORT_AVAILABLE_CODE.equals(item.getStatus())) {
+		if (item != null && ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_REPORT_AVAILABLE_CODE.equals(item.getStatus())) {
 			try {
 				//Get report owner user information
 				String givenName = "", familyName = "";
-				try{
+				try {
 					User user = userDirectoryService.getUser(item.getUserId());
 					givenName = user.getFirstName();
 					familyName = user.getLastName();
-				}catch (Exception e) {
+				} catch (Exception e) {
 					log.error(e.getMessage(), e);
 				}
 				Map<String, Object> data = new HashMap<String, Object>();
@@ -414,7 +414,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			} catch (Exception e) {
 				log.error(e.getLocalizedMessage(), e);
 			}
-		}else {
+		} else {
 			// Only generate viewerUrl if report is available
 			log.info("Content review item is not ready for the report: " + contentId + ", " + (item != null ? item.getStatus() : ""));
 		}
@@ -425,6 +425,15 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 	public int getReviewScore(String contentId, String assignmentRef, String userId)
 			throws QueueException, ReportException, Exception {
+		int score = crqs.getReviewScore(getProviderId(), contentId);
+		// TODO: could be null?
+		if (score == 9) {
+			ContentReviewItem item = crqs.getQueuedItem(getProviderId(), contentId).get();
+			item.setStatus((long) 4);
+			item.setRetryCount((long) 0);
+			item.setNextRetryTime(Calendar.getInstance().getTime());
+			return 4;
+		}
 		return crqs.getReviewScore(getProviderId(), contentId);
 	}
 
