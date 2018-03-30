@@ -189,6 +189,18 @@ public class ContentReviewQueueServiceImpl implements ContentReviewQueueService 
 		
 		return itemDao.findByProviderAndContentId(providerId, contentId);
 	}
+	
+	/* (non-Javadoc)
+	 * @see org.sakaiproject.contentreview.service.ContentReviewQueueService#getQueuedItem(java.lang.Integer, java.lang.String)
+	 */
+	@Override
+	@Transactional(readOnly=true)
+	public Optional<ContentReviewItem> getQueuedItemByExternalId(Integer providerId, String externalId) {
+		Objects.requireNonNull(providerId, "providerId cannot be null");
+		Objects.requireNonNull(externalId, "externalId cannot be null");
+		
+		return itemDao.findByProviderAndExternalId(providerId, externalId);
+	}
 
 	/* (non-Javadoc)
 	 * @see org.sakaiproject.contentreview.service.ContentReviewQueueService#getQueuedNotSubmittedItems(java.lang.Integer)
