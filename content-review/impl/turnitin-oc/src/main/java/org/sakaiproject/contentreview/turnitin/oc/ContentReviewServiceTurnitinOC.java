@@ -47,6 +47,7 @@ import org.apache.commons.lang.StringUtils;
 import org.sakaiproject.assignment.api.AssignmentConstants;
 import org.sakaiproject.assignment.api.AssignmentService;
 import org.sakaiproject.assignment.api.model.Assignment;
+import org.sakaiproject.assignment.api.model.AssignmentSubmission;
 import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.content.api.ContentHostingService;
 import org.sakaiproject.content.api.ContentResource;
@@ -497,7 +498,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		return response;
 	}
 
-	private void generateSimilarityReport(String reportId, String assignmentRef) throws Exception {
+	private void generateSimilarityReport(String reportId, String assignmentRef, boolean isDraft) throws Exception {
 		
 		Assignment assignment = assignmentService.getAssignment(entityManager.newReference(assignmentRef));
 		Map<String, String> assignmentSettings = assignment.getProperties();
@@ -527,6 +528,11 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		viewSettings.put("exclude_quotes", "true".equals(assignmentSettings.get("exclude_quoted")));
 		viewSettings.put("exclude_bibliography", "true".equals(assignmentSettings.get("exclude_biblio")));
 		reportData.put("view_settings", viewSettings);
+		
+		Map<String, Object> indexingSettings = new HashMap<String, Object>();
+		//Drafts are not added to index to avoid self plagiarism 
+		indexingSettings.put("add_to_index", !isDraft);
+		reportData.put("indexing_settings", indexingSettings);
 		
 		HashMap<String, Object> response = makeHttpCall("PUT",
 			getNormalizedServiceUrl() + "submissions/" + reportId + "/similarity",
@@ -718,7 +724,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						// Make sure due date is past						
 						if (assignmentDueDate.before(new Date())) {
 							// Regenerate similarity request 
-							generateSimilarityReport(item.getExternalId(), item.getTaskId());
+							// Report is recalled after due date, no need to check for draft 
+							generateSimilarityReport(item.getExternalId(), item.getTaskId(), true);
 							//Lookup reference item
 							String referenceItemContentId = item.getContentId().substring(0, item.getContentId().indexOf(PLACEHOLDER_STRING_FLAG));							
 							Optional<ContentReviewItem> quededReferenceItem = crqs.getQueuedItem(item.getProviderId(), referenceItemContentId);
@@ -915,7 +922,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						switch (submissionStatus) {
 						case "COMPLETE":
 							// If submission status is complete, start similarity report process
-							generateSimilarityReport(item.getExternalId(), item.getTaskId());
+							generateSimilarityReport(item.getExternalId(), item.getTaskId(), checkForDraft(item, assignment));
 							// Update item status for loop 2
 							item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
 							// Reset retry count
@@ -1046,6 +1053,19 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			crqs.update(item);
 		}
 		return true;
+	}
+	
+	private boolean checkForDraft(ContentReviewItem item, Assignment assignment) {
+		// Checks if current item is a draft or submitted
+		try {
+			AssignmentSubmission currentSubmission = assignmentService.getSubmission(assignment.getId(), item.getUserId());		
+			// Drafts return true, final submissions return false, if null return false			
+			return Optional.ofNullable(!currentSubmission.getSubmitted()).orElse(false);  	
+		} catch (Exception e) {				
+			log.error(e.getMessage(), e);
+			// Error retrieving draft, process item as final submission
+			return false;
+		}		
 	}
 
 	public int getDelayTime(long retries) {
