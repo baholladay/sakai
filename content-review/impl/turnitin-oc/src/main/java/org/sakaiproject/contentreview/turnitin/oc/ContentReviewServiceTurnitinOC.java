@@ -25,7 +25,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -981,7 +980,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						}
 						if(StringUtils.isNotEmpty(errorStr)) {
 							item.setLastError(errorStr);
-							item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMISSION_ERROR_NO_RETRY_CODE);
+							item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMISSION_ERROR_RETRY_CODE);
 							crqs.update(item);
 							errors++;
 						}
