@@ -362,7 +362,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		String viewerUrl = null;
 		Optional<ContentReviewItem> optionalItem = crqs.getQueuedItem(getProviderId(), contentId);
 		ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
-		if (item != null && ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_REPORT_AVAILABLE_CODE.equals(item.getStatus())) {
+		if(item != null && ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_REPORT_AVAILABLE_CODE.equals(item.getStatus())) {
 			try {
 				//Get report owner user information
 				String givenName = "", familyName = "";
@@ -424,20 +424,25 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 	public int getReviewScore(String contentId, String assignmentRef, String userId)
 			throws QueueException, ReportException, Exception {
-		int score = crqs.getReviewScore(getProviderId(), contentId);
-		// TODO: could be null?
-		if (score == 9) {
-			ContentReviewItem item = crqs.getQueuedItem(getProviderId(), contentId).get();
-			item.setStatus((long) 4);
-			item.setRetryCount((long) 0);
-			item.setNextRetryTime(Calendar.getInstance().getTime());
-			return 4;
-		}
 		return crqs.getReviewScore(getProviderId(), contentId);
 	}
 
 	public Long getReviewStatus(String contentId) throws QueueException {
-		return crqs.getReviewStatus(getProviderId(), contentId);
+		ContentReviewItem item = crqs.getQueuedItem(getProviderId(), contentId).get();
+		long status = item.getStatus();
+		if (status == 9) {
+			if (StringUtils.isEmpty(item.getExternalId())) {
+				item.setStatus((long) 1);
+			} else {
+				item.setStatus((long) 4);
+			}
+
+			item.setRetryCount((long) 0);
+			item.setLastError(null);
+			item.setNextRetryTime(Calendar.getInstance().getTime());
+			return (long) 4;
+		}
+		return status;
 	}
 
 	public String getServiceName() {
