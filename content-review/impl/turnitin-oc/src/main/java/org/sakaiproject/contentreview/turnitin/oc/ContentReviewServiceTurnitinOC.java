@@ -177,7 +177,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 		try {
 			// Get the webhook url
-			String webhookUrl = getWebhookUrl(Optional.empty());
+//			String webhookUrl = getWebhookUrl(Optional.empty());
+			String webhookUrl = "https://c6f0bec6.ngrok.io/content-review-tool/webhooks?providerName=TurnitinOC";
 			boolean webhooksSetup = false;
 			// Check to see if any webhooks have already been set up for this url
 			for (Webhook webhook : getWebhooks()) {
@@ -1159,6 +1160,46 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		}
 		body = stringBuilder.toString();
 		log.info(body);
+		
+		
+		JSONObject webhookJSON = JSONObject.fromObject(body);
+		
+		log.info(request.getHeader("X-Turnitin-Signature"));	
+		
+		String eventType = request.getHeader("X-Turnitin-Eventtype");
+		
+		if (eventType.equals("SUBMISSION_COMPLETE")); {
+			
+			try {
+				if (webhookJSON.has("id") && webhookJSON.get("status").equals("COMPLETE")) {
+					log.info("content review item external id: " + webhookJSON.getString("id"));				
+					String external_id = webhookJSON.getString("id");					
+					Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), external_id);
+					ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
+					generateSimilarityReport(item.getExternalId(), item.getTaskId());
+				}				
+				
+			} catch (Exception e) {
+				log.error(e.getLocalizedMessage(), e);
+			}
+		}
+		
+		if (eventType.equals("SIMILARITY_COMPLETE")) {
+			try {
+				if (webhookJSON.has("submission_id") && webhookJSON.get("status").equals("COMPLETE")) {
+					String external_id = webhookJSON.getString("submission_id");
+					log.info("content review item external id: " + webhookJSON.getString("submission_id"));
+					Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), external_id);
+					ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
+					item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_REPORT_AVAILABLE_CODE);
+				}
+			
+			} catch (Exception e) {
+				log.error(e.getLocalizedMessage(), e);
+			
+			}
+			
+		}
 	}
 	
 	@Getter
