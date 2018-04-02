@@ -712,7 +712,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				}
 				// Check if any placeholder items need to regenerate report after due date
 				if (PLACEHOLDER_ITEM_REVIEW_SCORE.equals(item.getReviewScore())) {	
-					handlePlaceholderItems(item);					
+					handlePlaceholderItem(item);					
 				}
 				// Get status of similarity report
 				// Returns -1 if report is still processing
@@ -735,48 +735,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		}
 		log.info("Turnitin report queue run completed: " + success + " items submitted, " + errors + " errors.");		
 	}
-	
-	private void handlePlaceholderItems(ContentReviewItem item) throws Exception {
-		Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
-		Date assignmentDueDate = Date.from(assignment.getDueDate());
-		if(assignment != null && assignmentDueDate != null ) {
-			// Make sure due date is past						
-			if (assignmentDueDate.before(new Date())) {
-				// Regenerate similarity request 
-				generateSimilarityReport(item.getExternalId(), item.getTaskId());
-				//Lookup reference item
-				String referenceItemContentId = item.getContentId().substring(0, item.getContentId().indexOf(PLACEHOLDER_STRING_FLAG));							
-				Optional<ContentReviewItem> quededReferenceItem = crqs.getQueuedItem(item.getProviderId(), referenceItemContentId);
-				ContentReviewItem referenceItem = quededReferenceItem.isPresent() ? quededReferenceItem.get() : null;							
-				//reschedule reference item by setting score to null, reset retry time and set status to awaiting report
-				if (referenceItem != null) {
-					referenceItem.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
-					referenceItem.setRetryCount(Long.valueOf(0));
-					referenceItem.setReviewScore(null);
-					referenceItem.setNextRetryTime(new Date());
-					crqs.update(referenceItem);
-					// Report regenerated for reference item, placeholder item is no longer needed
-					crqs.delete(item);													
-				}
-				else {
-					// Reference item no longer exists
-					// Placeholder item is no longer needed
-					crqs.delete(item);
-				}
-			} else {
-				// We don't want placeholder items to exceed retry count maximum
-				// Reset retry count to zero
-				item.setRetryCount(Long.valueOf(0));
-				item.setNextRetryTime(getDueDateRetryTime(assignmentDueDate));
-				crqs.update(item);
-			}					
-		}else {
-			// Assignment or due date no longer exist
-			// placeholder item is no longer needed
-			crqs.delete(item);
-		}
-	}
-	
+		
 	public void processUnsubmitted() {
 		// Submission process phase 1
 		// 1. Establish submission object, get ID
@@ -944,6 +903,47 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		placeholderItem.setTaskId(item.getTaskId());																	
 		crqs.update(placeholderItem);
 	}		
+	
+	private void handlePlaceholderItem(ContentReviewItem item) throws Exception {
+		Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
+		Date assignmentDueDate = Date.from(assignment.getDueDate());
+		if(assignment != null && assignmentDueDate != null ) {
+			// Make sure due date is past						
+			if (assignmentDueDate.before(new Date())) {
+				// Regenerate similarity request 
+				generateSimilarityReport(item.getExternalId(), item.getTaskId());
+				//Lookup reference item
+				String referenceItemContentId = item.getContentId().substring(0, item.getContentId().indexOf(PLACEHOLDER_STRING_FLAG));							
+				Optional<ContentReviewItem> quededReferenceItem = crqs.getQueuedItem(item.getProviderId(), referenceItemContentId);
+				ContentReviewItem referenceItem = quededReferenceItem.isPresent() ? quededReferenceItem.get() : null;							
+				//reschedule reference item by setting score to null, reset retry time and set status to awaiting report
+				if (referenceItem != null) {
+					referenceItem.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
+					referenceItem.setRetryCount(Long.valueOf(0));
+					referenceItem.setReviewScore(null);
+					referenceItem.setNextRetryTime(new Date());
+					crqs.update(referenceItem);
+					// Report regenerated for reference item, placeholder item is no longer needed
+					crqs.delete(item);													
+				}
+				else {
+					// Reference item no longer exists
+					// Placeholder item is no longer needed
+					crqs.delete(item);
+				}
+			} else {
+				// We don't want placeholder items to exceed retry count maximum
+				// Reset retry count to zero
+				item.setRetryCount(Long.valueOf(0));
+				item.setNextRetryTime(getDueDateRetryTime(assignmentDueDate));
+				crqs.update(item);
+			}					
+		}else {
+			// Assignment or due date no longer exist
+			// placeholder item is no longer needed
+			crqs.delete(item);
+		}
+	}
 	
 	private void handleSubmissionStatus(String submissionStatus, ContentReviewItem item, Assignment assignment) {
 		
@@ -1219,7 +1219,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 					
 					// Check if any placeholder items need to regenerate report after due date
 					if (PLACEHOLDER_ITEM_REVIEW_SCORE.equals(item.getReviewScore())) {	
-						handlePlaceholderItems(item);					
+						handlePlaceholderItem(item);					
 					} else {
 						handleReportStatus(item, webhookJSON.getInt("overall_match_percentage"));
 					}															
