@@ -712,18 +712,15 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				}
 				// Check if any placeholder items need to regenerate report after due date
 				if (PLACEHOLDER_ITEM_REVIEW_SCORE.equals(item.getReviewScore())) {	
-					handlePlaceholderItem(item);					
+					handlePlaceholderItem(item);
+					continue;
 				}
 				// Get status of similarity report
 				// Returns -1 if report is still processing
 				// Returns -2 if an error occurs
 				// Else returns reports score as integer																	
 				int status = getSimilarityReportStatus(item.getExternalId());
-				
-				handleReportStatus(item, status);
-				
-				// TODO add handleReportStatus
-				// TODO add handlePlaceholderItems 								
+				handleReportStatus(item, status);					
 
 			} catch (Exception e) {
 				log.error(e.getLocalizedMessage(), e);
@@ -896,7 +893,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		placeholderItem.setDateSubmitted(new Date());
 		placeholderItem.setRetryCount(new Long(0));	
 		// All other fields are copied from original item 
-		placeholderItem.setExternalId(item.getExternalId());
+		// This is needed for webhook call querys unique item each time 
+		placeholderItem.setExternalId(item.getExternalId() + PLACEHOLDER_STRING_FLAG);
 		placeholderItem.setProviderId(item.getProviderId());						
 		placeholderItem.setUserId(item.getUserId());
 		placeholderItem.setSiteId(item.getSiteId());
@@ -909,15 +907,15 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		Date assignmentDueDate = Date.from(assignment.getDueDate());
 		if(assignment != null && assignmentDueDate != null ) {
 			// Make sure due date is past						
-			if (assignmentDueDate.before(new Date())) {
-				// Regenerate similarity request 
-				generateSimilarityReport(item.getExternalId(), item.getTaskId());
+			if (assignmentDueDate.before(new Date())) {				
 				//Lookup reference item
 				String referenceItemContentId = item.getContentId().substring(0, item.getContentId().indexOf(PLACEHOLDER_STRING_FLAG));							
 				Optional<ContentReviewItem> quededReferenceItem = crqs.getQueuedItem(item.getProviderId(), referenceItemContentId);
 				ContentReviewItem referenceItem = quededReferenceItem.isPresent() ? quededReferenceItem.get() : null;							
-				//reschedule reference item by setting score to null, reset retry time and set status to awaiting report
 				if (referenceItem != null) {
+					// Regenerate similarity request for reference id
+					generateSimilarityReport(referenceItem.getExternalId(), referenceItem.getTaskId());
+					//reschedule reference item by setting score to null, reset retry time and set status to awaiting report
 					referenceItem.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
 					referenceItem.setRetryCount(Long.valueOf(0));
 					referenceItem.setReviewScore(null);
@@ -1183,13 +1181,9 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		body = stringBuilder.toString();		
 		JSONObject webhookJSON = JSONObject.fromObject(body);
 		
-		//TODO HANDLE webhook signatures 
-		//log.info(request.getHeader("X-Turnitin-Signature"));	
-		
 		String eventType = request.getHeader("X-Turnitin-Eventtype");
 		
 		if (eventType.equals("SUBMISSION_COMPLETE")); {
-			
 			try {
 				if (webhookJSON.has("id") && webhookJSON.get("status").equals("COMPLETE")) {
 					log.info("Submission complete webhook cb received");
@@ -1197,10 +1191,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 					String external_id = webhookJSON.getString("id");					
 					Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), external_id);
 					ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
-					Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
-					
-					handleSubmissionStatus(webhookJSON.getString("status"), item, assignment);
-					
+					Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));					
+					handleSubmissionStatus(webhookJSON.getString("status"), item, assignment);					
 				}				
 				
 			} catch (Exception e) {
@@ -1216,20 +1208,12 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 					log.info(webhookJSON.toString());
 					Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), external_id);
 					ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
-					
-					// Check if any placeholder items need to regenerate report after due date
-					if (PLACEHOLDER_ITEM_REVIEW_SCORE.equals(item.getReviewScore())) {	
-						handlePlaceholderItem(item);					
-					} else {
-						handleReportStatus(item, webhookJSON.getInt("overall_match_percentage"));
-					}															
+					handleReportStatus(item, webhookJSON.getInt("overall_match_percentage"));															
 				}
 			
 			} catch (Exception e) {
-				log.error(e.getLocalizedMessage(), e);
-			
-			}
-			
+				log.error(e.getLocalizedMessage(), e);			
+			}			
 		}
 	}
 	
