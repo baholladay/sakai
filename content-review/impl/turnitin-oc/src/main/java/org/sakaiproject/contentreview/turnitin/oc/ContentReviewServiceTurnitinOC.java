@@ -178,7 +178,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		try {
 			// Get the webhook url
 //			String webhookUrl = getWebhookUrl(Optional.empty());
-			String webhookUrl = "https://c6f0bec6.ngrok.io/content-review-tool/webhooks?providerName=TurnitinOC";
+			String webhookUrl = "https://ac04cca0.ngrok.io/content-review-tool/webhooks?providerName=TurnitinOC";
 			boolean webhooksSetup = false;
 			// Check to see if any webhooks have already been set up for this url
 			for (Webhook webhook : getWebhooks()) {
@@ -1158,13 +1158,11 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				}
 			}
 		}
-		body = stringBuilder.toString();
-		log.info(body);
-		
-		
+		body = stringBuilder.toString();		
 		JSONObject webhookJSON = JSONObject.fromObject(body);
 		
-		log.info(request.getHeader("X-Turnitin-Signature"));	
+		//TODO HANDLE webhook signatures 
+		//log.info(request.getHeader("X-Turnitin-Signature"));	
 		
 		String eventType = request.getHeader("X-Turnitin-Eventtype");
 		
@@ -1172,11 +1170,18 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			
 			try {
 				if (webhookJSON.has("id") && webhookJSON.get("status").equals("COMPLETE")) {
-					log.info("content review item external id: " + webhookJSON.getString("id"));				
+					log.info("Submission complete webhook cb received");
+					log.info(webhookJSON.toString());
 					String external_id = webhookJSON.getString("id");					
 					Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), external_id);
 					ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
 					generateSimilarityReport(item.getExternalId(), item.getTaskId());
+					item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
+					item.setDateReportReceived(new Date());
+					item.setRetryCount(Long.valueOf(0));
+					item.setLastError(null);
+					item.setErrorCode(null);
+					crqs.update(item);
 				}				
 				
 			} catch (Exception e) {
@@ -1188,10 +1193,17 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			try {
 				if (webhookJSON.has("submission_id") && webhookJSON.get("status").equals("COMPLETE")) {
 					String external_id = webhookJSON.getString("submission_id");
-					log.info("content review item external id: " + webhookJSON.getString("submission_id"));
+					log.info("Similarity complete webhook cb received");
+					log.info(webhookJSON.toString());
 					Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), external_id);
 					ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
 					item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_REPORT_AVAILABLE_CODE);
+					item.setReviewScore(webhookJSON.getInt("overall_match_percentage"));													
+					item.setDateReportReceived(new Date());
+					item.setRetryCount(Long.valueOf(0));
+					item.setLastError(null);
+					item.setErrorCode(null);
+					crqs.update(item);
 				}
 			
 			} catch (Exception e) {
