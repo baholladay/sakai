@@ -60,6 +60,7 @@ import org.sakaiproject.contentreview.exception.TransientSubmissionException;
 import org.sakaiproject.contentreview.service.BaseContentReviewService;
 import org.sakaiproject.contentreview.service.ContentReviewQueueService;
 import org.sakaiproject.entity.api.EntityManager;
+import org.sakaiproject.entity.api.Reference;
 import org.sakaiproject.entity.api.ResourceProperties;
 import org.sakaiproject.exception.IdUnusedException;
 import org.sakaiproject.exception.PermissionException;
@@ -137,6 +138,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	private static final String GENERATE_REPORTS_ON_DUE_DATE = "2";	
 	private static final String PLACEHOLDER_STRING_FLAG = "_placeholder";
 	private static final Integer PLACEHOLDER_ITEM_REVIEW_SCORE = -10;
+	private static final String DRAFT_PLACEHOLDER_STRING_FLAG = "_draft";
+	private static final Integer DRAFT_PLACEHOLDER_ITEM_REVIEW_SCORE = -20;
 
 	private String serviceUrl;
 	private String apiKey;
@@ -765,6 +768,56 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						continue;
 					}				
 				}
+				// Check if any drafts need to index reports after due date
+				if (DRAFT_PLACEHOLDER_ITEM_REVIEW_SCORE.equals(item.getReviewScore())) {	
+					Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
+					Date assignmentDueDate = Date.from(assignment.getDueDate());
+					if(assignment != null && assignmentDueDate != null ) {
+						// Make sure due date is past						
+						if (assignmentDueDate.before(new Date())) {				
+							//Lookup reference item
+							String referenceItemContentId = item.getContentId().substring(0, item.getContentId().indexOf(DRAFT_PLACEHOLDER_STRING_FLAG));							
+							Optional<ContentReviewItem> quededReferenceItem = crqs.getQueuedItem(item.getProviderId(), referenceItemContentId);
+							ContentReviewItem referenceItem = quededReferenceItem.isPresent() ? quededReferenceItem.get() : null;							
+							if (referenceItem != null) {
+								// Regenerate similarity request for reference id
+								// Report is recalled after due date, item is no longer considered a draft and should be indexed  
+								generateSimilarityReport(referenceItem.getExternalId(), referenceItem.getTaskId(), false);
+								//reschedule reference item by setting score to null, reset retry time and set status to awaiting report
+								referenceItem.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
+								referenceItem.setRetryCount(Long.valueOf(0));
+								referenceItem.setReviewScore(null);
+								referenceItem.setNextRetryTime(new Date());
+								crqs.update(referenceItem);
+								// Report regenerated for reference item, placeholder item is no longer needed
+								crqs.delete(item);
+								success++;
+								continue;
+							}
+							else {
+								// Reference item no longer exists
+								// Placeholder item is no longer needed
+								crqs.delete(item);
+								errors++;
+								continue;
+							}
+						} else {
+							// We don't want placeholder items to exceed retry count maximum
+							// Reset retry count to zero
+							item.setRetryCount(Long.valueOf(0));
+							item.setNextRetryTime(getDueDateRetryTime(assignmentDueDate));
+							crqs.update(item);
+							continue;
+						}					
+					}else {
+						// Assignment or due date no longer exist
+						// placeholder item is no longer needed
+						crqs.delete(item);
+						errors++;
+						continue;
+					}				
+				}
+				
 				// Get status of similarity report
 				// Returns -1 if report is still processing
 				// Returns -2 if an error occurs
@@ -799,7 +852,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 					errors++;
 					continue;
 				}						
-				// Handle items that only generate reports on due date				
+				// Handle drafts and items that only generate reports on due date				
 				// Get assignment associated with current item's task Id
 				Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
 				Date assignmentDueDate = null;
@@ -807,6 +860,13 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				if(assignment != null) {
 					assignmentDueDate = Date.from(assignment. getDueDate());					
 					reportGenSpeed = assignment.getProperties().get("report_gen_speed");
+					
+					// Create needed draft placeholder items
+					if (checkForDraft(item, assignment)) {
+						log.info("Submission is a draft creating placeholder that will index draft after due date");
+						createDraftPlaceholderItem(item, assignmentDueDate);
+					}										
+					
 					// If report gen speed is set to due date, and it's before the due date right now, do not process item
 					if (assignmentDueDate != null && GENERATE_REPORTS_ON_DUE_DATE.equals(reportGenSpeed) 
 							&& assignmentDueDate.after(new Date())) {
@@ -941,6 +1001,25 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			// Error retrieving draft, process item as final submission
 			return false;
 		}		
+	}
+	
+	private void createDraftPlaceholderItem(ContentReviewItem item, Date dueDate) {
+		log.info("Creating placeholder draft item for indexing when due date is passed for ItemID: " + item.getId());
+		ContentReviewItem draftPlaceholderItem = new ContentReviewItem();
+		draftPlaceholderItem.setReviewScore(DRAFT_PLACEHOLDER_ITEM_REVIEW_SCORE);
+		draftPlaceholderItem.setContentId(item.getContentId() + DRAFT_PLACEHOLDER_STRING_FLAG);
+		draftPlaceholderItem.setExternalId(item.getExternalId() + PLACEHOLDER_STRING_FLAG);
+		draftPlaceholderItem.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
+		draftPlaceholderItem.setNextRetryTime(getDueDateRetryTime(dueDate));
+		draftPlaceholderItem.setDateQueued(new Date());
+		draftPlaceholderItem.setDateSubmitted(new Date());
+		draftPlaceholderItem.setRetryCount(new Long(0));	
+		// All other fields are copied from original item 		
+		draftPlaceholderItem.setProviderId(item.getProviderId());						
+		draftPlaceholderItem.setUserId(item.getUserId());
+		draftPlaceholderItem.setSiteId(item.getSiteId());
+		draftPlaceholderItem.setTaskId(item.getTaskId());																	
+		crqs.update(draftPlaceholderItem);
 	}
 	
 	private void createPlaceholderItem(ContentReviewItem item, Date dueDate) {
@@ -1212,8 +1291,13 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						log.info(webhookJSON.toString());						
 						Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), webhookJSON.getString("id"));
 						ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
-						Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));					
-						handleSubmissionStatus(webhookJSON.getString("status"), item, assignment);					
+//						Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));					
+//						handleSubmissionStatus(webhookJSON.getString("status"), item, assignment);						
+						item.setRetryCount(Long.valueOf(0));
+						item.setReviewScore(null);
+						item.setNextRetryTime(new Date());
+						crqs.update(item);
+						processQueue();
 					} else {
 						log.warn("Callback item received without an id");
 					}
@@ -1225,7 +1309,12 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						log.info(webhookJSON.toString());
 						Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), webhookJSON.getString("submission_id"));
 						ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
-						handleReportStatus(item, webhookJSON.getInt("overall_match_percentage"));															
+						item.setRetryCount(Long.valueOf(0));
+						item.setReviewScore(null);
+						item.setNextRetryTime(new Date());
+						crqs.update(item);
+						processQueue();
+//						handleReportStatus(item, webhookJSON.getInt("overall_match_percentage"));															
 					} else {
 						log.warn("Callback item received without a submission id");
 					}
