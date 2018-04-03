@@ -178,7 +178,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		try {
 			// Get the webhook url
 //			String webhookUrl = getWebhookUrl(Optional.empty());
-			String webhookUrl = "https://ac04cca0.ngrok.io/content-review-tool/webhooks?providerName=TurnitinOC";
+			String webhookUrl = "https://244fb522.ngrok.io/content-review-tool/webhooks?providerName=TurnitinOC";
 			boolean webhooksSetup = false;
 			// Check to see if any webhooks have already been set up for this url
 			for (Webhook webhook : getWebhooks()) {
@@ -712,8 +712,51 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				}
 				// Check if any placeholder items need to regenerate report after due date
 				if (PLACEHOLDER_ITEM_REVIEW_SCORE.equals(item.getReviewScore())) {	
-					handlePlaceholderItem(item);
-					continue;
+					Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
+					Date assignmentDueDate = Date.from(assignment.getDueDate());
+					if(assignment != null && assignmentDueDate != null ) {
+						// Make sure due date is past						
+						if (assignmentDueDate.before(new Date())) {				
+							//Lookup reference item
+							String referenceItemContentId = item.getContentId().substring(0, item.getContentId().indexOf(PLACEHOLDER_STRING_FLAG));							
+							Optional<ContentReviewItem> quededReferenceItem = crqs.getQueuedItem(item.getProviderId(), referenceItemContentId);
+							ContentReviewItem referenceItem = quededReferenceItem.isPresent() ? quededReferenceItem.get() : null;							
+							if (referenceItem != null) {
+								// Regenerate similarity request for reference id
+								generateSimilarityReport(referenceItem.getExternalId(), referenceItem.getTaskId());
+								//reschedule reference item by setting score to null, reset retry time and set status to awaiting report
+								referenceItem.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
+								referenceItem.setRetryCount(Long.valueOf(0));
+								referenceItem.setReviewScore(null);
+								referenceItem.setNextRetryTime(new Date());
+								crqs.update(referenceItem);
+								// Report regenerated for reference item, placeholder item is no longer needed
+								crqs.delete(item);
+								success++;
+								continue;
+							}
+							else {
+								// Reference item no longer exists
+								// Placeholder item is no longer needed
+								crqs.delete(item);
+								errors++;
+								continue;
+							}
+						} else {
+							// We don't want placeholder items to exceed retry count maximum
+							// Reset retry count to zero
+							item.setRetryCount(Long.valueOf(0));
+							item.setNextRetryTime(getDueDateRetryTime(assignmentDueDate));
+							crqs.update(item);
+							continue;
+						}					
+					}else {
+						// Assignment or due date no longer exist
+						// placeholder item is no longer needed
+						crqs.delete(item);
+						errors++;
+						continue;
+					}				
 				}
 				// Get status of similarity report
 				// Returns -1 if report is still processing
@@ -886,62 +929,21 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		// Review score is used as flag for placeholder items in checkForReport
 		placeholderItem.setReviewScore(PLACEHOLDER_ITEM_REVIEW_SCORE); 
 		// Content Id must be original
-		placeholderItem.setContentId(item.getContentId() + PLACEHOLDER_STRING_FLAG);	
+		placeholderItem.setContentId(item.getContentId() + PLACEHOLDER_STRING_FLAG);
+		// This is needed for webhook call, without it external id query does not return a single item 
+		placeholderItem.setExternalId(item.getExternalId() + PLACEHOLDER_STRING_FLAG);
 		placeholderItem.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
 		placeholderItem.setNextRetryTime(getDueDateRetryTime(dueDate));
 		placeholderItem.setDateQueued(new Date());
 		placeholderItem.setDateSubmitted(new Date());
 		placeholderItem.setRetryCount(new Long(0));	
-		// All other fields are copied from original item 
-		// This is needed for webhook call querys unique item each time 
-		placeholderItem.setExternalId(item.getExternalId() + PLACEHOLDER_STRING_FLAG);
+		// All other fields are copied from original item 		
 		placeholderItem.setProviderId(item.getProviderId());						
 		placeholderItem.setUserId(item.getUserId());
 		placeholderItem.setSiteId(item.getSiteId());
 		placeholderItem.setTaskId(item.getTaskId());																	
 		crqs.update(placeholderItem);
-	}		
-	
-	private void handlePlaceholderItem(ContentReviewItem item) throws Exception {
-		Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
-		Date assignmentDueDate = Date.from(assignment.getDueDate());
-		if(assignment != null && assignmentDueDate != null ) {
-			// Make sure due date is past						
-			if (assignmentDueDate.before(new Date())) {				
-				//Lookup reference item
-				String referenceItemContentId = item.getContentId().substring(0, item.getContentId().indexOf(PLACEHOLDER_STRING_FLAG));							
-				Optional<ContentReviewItem> quededReferenceItem = crqs.getQueuedItem(item.getProviderId(), referenceItemContentId);
-				ContentReviewItem referenceItem = quededReferenceItem.isPresent() ? quededReferenceItem.get() : null;							
-				if (referenceItem != null) {
-					// Regenerate similarity request for reference id
-					generateSimilarityReport(referenceItem.getExternalId(), referenceItem.getTaskId());
-					//reschedule reference item by setting score to null, reset retry time and set status to awaiting report
-					referenceItem.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
-					referenceItem.setRetryCount(Long.valueOf(0));
-					referenceItem.setReviewScore(null);
-					referenceItem.setNextRetryTime(new Date());
-					crqs.update(referenceItem);
-					// Report regenerated for reference item, placeholder item is no longer needed
-					crqs.delete(item);													
-				}
-				else {
-					// Reference item no longer exists
-					// Placeholder item is no longer needed
-					crqs.delete(item);
-				}
-			} else {
-				// We don't want placeholder items to exceed retry count maximum
-				// Reset retry count to zero
-				item.setRetryCount(Long.valueOf(0));
-				item.setNextRetryTime(getDueDateRetryTime(assignmentDueDate));
-				crqs.update(item);
-			}					
-		}else {
-			// Assignment or due date no longer exist
-			// placeholder item is no longer needed
-			crqs.delete(item);
-		}
-	}
+	}						
 	
 	private void handleSubmissionStatus(String submissionStatus, ContentReviewItem item, Assignment assignment) {
 		
@@ -1178,30 +1180,34 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				}
 			}
 		}
-		body = stringBuilder.toString();		
-		JSONObject webhookJSON = JSONObject.fromObject(body);						
 		
-			try {
-				String eventType = request.getHeader("X-Turnitin-Eventtype");
+		body = stringBuilder.toString();		
+		JSONObject webhookJSON = JSONObject.fromObject(body);
+		String eventType = request.getHeader("X-Turnitin-Eventtype");
+		
+			try {				
 				if (eventType.equals("SUBMISSION_COMPLETE")) {
 					if (webhookJSON.has("id") && webhookJSON.get("status").equals("COMPLETE")) {
 						log.info("Submission complete webhook cb received");
-						log.info(webhookJSON.toString());
-						String external_id = webhookJSON.getString("id");					
-						Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), external_id);
+						log.info(webhookJSON.toString());						
+						Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), webhookJSON.getString("id"));
 						ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
 						Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));					
 						handleSubmissionStatus(webhookJSON.getString("status"), item, assignment);					
+					} else {
+						log.warn("Callback item received without an id");
 					}
+					
 				}
 				if (eventType.equals("SIMILARITY_COMPLETE")) {
-					if (webhookJSON.has("submission_id") && webhookJSON.get("status").equals("COMPLETE")) {
-						String external_id = webhookJSON.getString("submission_id");
+					if (webhookJSON.has("submission_id") && webhookJSON.get("status").equals("COMPLETE")) {						
 						log.info("Similarity complete webhook cb received");
 						log.info(webhookJSON.toString());
-						Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), external_id);
+						Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), webhookJSON.getString("submission_id"));
 						ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
 						handleReportStatus(item, webhookJSON.getInt("overall_match_percentage"));															
+					} else {
+						log.warn("Callback item received without a submission id");
 					}
 				}
 				
