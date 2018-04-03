@@ -184,7 +184,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		try {
 			// Get the webhook url
 //			String webhookUrl = getWebhookUrl(Optional.empty());
-			String webhookUrl = "https://244fb522.ngrok.io/content-review-tool/webhooks?providerName=TurnitinOC";
+			String webhookUrl = "https://44444038.ngrok.io/content-review-tool/webhooks?providerName=TurnitinOC";
 			boolean webhooksSetup = false;
 			// Check to see if any webhooks have already been set up for this url
 			for (Webhook webhook : getWebhooks()) {
@@ -920,11 +920,11 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						fileName += HTML_EXTENSION;
 					}
 					
-					// TODO fix this it doesn't work 
+					// TODO Find better draft flag to do this
 					if(flagDraftSubmissions(item, assignment)) {
 						// Flag Draft 
-						item.setReviewScore(DRAFT_PLACEHOLDER_ITEM_REVIEW_SCORE);						
-						log.info("Submission is a draft creating placeholder that will index draft after due date");
+						item.setReviewScore(DRAFT_ITEM_REVIEW_SCORE);						
+						// Create placeholder to index drafts after Due Date
 						createDraftPlaceholderItem(item, assignmentDueDate);		 							
 					}
 					
@@ -1016,7 +1016,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 //			AssignmentSubmission currentSubmission = assignmentService.getSubmission(assignment.getId(), item.getUserId());		
 			// Drafts return true, final submissions return false, if null return false						
 //			return Optional.ofNullable(item.getExternalId().endsWith(DRAFT_EXTENSION)).orElse(false);
-			return DRAFT_PLACEHOLDER_ITEM_REVIEW_SCORE.equals(item.getReviewScore());
+			return DRAFT_ITEM_REVIEW_SCORE.equals(item.getReviewScore());
 		} catch (Exception e) {				
 			log.error(e.getMessage(), e);
 			// Error retrieving draft, process item as final submission
@@ -1149,8 +1149,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	
 	private void handleReportStatus(ContentReviewItem item, int status) {
 
-		// Check if any placeholder items need to regenerate report after due date
-		// If item already has a score at this point, it is a placeholder
+		// Any status above -1 is the report score
 		if (status > -1) {					
 			log.info("Report complete! Score: " + status);
 			// Status value is report score
@@ -1327,6 +1326,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						log.info(webhookJSON.toString());
 						Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), webhookJSON.getString("submission_id"));
 						ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
+						// Make sure to set item score to null at this point, since overall_match_percentage is finalized 
+						item.setReviewScore(null);
 						handleReportStatus(item, webhookJSON.getInt("overall_match_percentage"));															
 					} else {
 						log.warn("Callback item received without a submission id");
