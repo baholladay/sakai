@@ -1179,42 +1179,35 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			}
 		}
 		body = stringBuilder.toString();		
-		JSONObject webhookJSON = JSONObject.fromObject(body);
+		JSONObject webhookJSON = JSONObject.fromObject(body);						
 		
-		String eventType = request.getHeader("X-Turnitin-Eventtype");
-		
-		if (eventType.equals("SUBMISSION_COMPLETE")); {
 			try {
-				if (webhookJSON.has("id") && webhookJSON.get("status").equals("COMPLETE")) {
-					log.info("Submission complete webhook cb received");
-					log.info(webhookJSON.toString());
-					String external_id = webhookJSON.getString("id");					
-					Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), external_id);
-					ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
-					Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));					
-					handleSubmissionStatus(webhookJSON.getString("status"), item, assignment);					
-				}				
+				String eventType = request.getHeader("X-Turnitin-Eventtype");
+				if (eventType.equals("SUBMISSION_COMPLETE")) {
+					if (webhookJSON.has("id") && webhookJSON.get("status").equals("COMPLETE")) {
+						log.info("Submission complete webhook cb received");
+						log.info(webhookJSON.toString());
+						String external_id = webhookJSON.getString("id");					
+						Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), external_id);
+						ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
+						Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));					
+						handleSubmissionStatus(webhookJSON.getString("status"), item, assignment);					
+					}
+				}
+				if (eventType.equals("SIMILARITY_COMPLETE")) {
+					if (webhookJSON.has("submission_id") && webhookJSON.get("status").equals("COMPLETE")) {
+						String external_id = webhookJSON.getString("submission_id");
+						log.info("Similarity complete webhook cb received");
+						log.info(webhookJSON.toString());
+						Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), external_id);
+						ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
+						handleReportStatus(item, webhookJSON.getInt("overall_match_percentage"));															
+					}
+				}
 				
 			} catch (Exception e) {
 				log.error(e.getLocalizedMessage(), e);
 			}
-		}
-		
-		if (eventType.equals("SIMILARITY_COMPLETE")) {
-			try {
-				if (webhookJSON.has("submission_id") && webhookJSON.get("status").equals("COMPLETE")) {
-					String external_id = webhookJSON.getString("submission_id");
-					log.info("Similarity complete webhook cb received");
-					log.info(webhookJSON.toString());
-					Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), external_id);
-					ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
-					handleReportStatus(item, webhookJSON.getInt("overall_match_percentage"));															
-				}
-			
-			} catch (Exception e) {
-				log.error(e.getLocalizedMessage(), e);			
-			}			
-		}
 	}
 	
 	@Getter
