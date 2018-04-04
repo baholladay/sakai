@@ -139,9 +139,13 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	private static final String GENERATE_REPORTS_ON_DUE_DATE = "2";	
 	private static final String PLACEHOLDER_STRING_FLAG = "_placeholder";
 	private static final Integer PLACEHOLDER_ITEM_REVIEW_SCORE = -10;
-	private static final String DRAFT_PLACEHOLDER_STRING_FLAG = "_draft";
+	private static final String DRAFT_PLACEHOLDER_STRING_FLAG = "draft";
 	private static final Integer DRAFT_ITEM_REVIEW_SCORE = -15;
 	private static final Integer DRAFT_PLACEHOLDER_ITEM_REVIEW_SCORE = -20;
+
+	private static final String COMPLETE_STATE = "complete";
+	private static final String PROCESSING_STATE = "processing";
+	private static final String ERROR_STATE = "error";
 
 	private String serviceUrl;
 	private String apiKey;
@@ -184,7 +188,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		try {
 			// Get the webhook url
 //			String webhookUrl = getWebhookUrl(Optional.empty());
-			String webhookUrl = "https://44444038.ngrok.io/content-review-tool/webhooks?providerName=TurnitinOC";
+			String webhookUrl = "https://b10266d9.ngrok.io/content-review-tool/webhooks?providerName=TurnitinOC";
 			boolean webhooksSetup = false;
 			// Check to see if any webhooks have already been set up for this url
 			for (Webhook webhook : getWebhooks()) {
@@ -826,10 +830,11 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				// Else returns reports score as integer																	
 				int status = getSimilarityReportStatus(item.getExternalId());
 				String reportState = handleReportStatus(item, status);
-				if (reportState != null && "complete".equals(reportState)) {
+				if (COMPLETE_STATE.equals(reportState)) {
 					success++;
+				} else if (ERROR_STATE.equals(reportState)) {
+					errors++;
 				}
-
 			} catch (Exception e) {
 				log.error(e.getLocalizedMessage(), e);
 				item.setLastError(e.getMessage());
@@ -984,9 +989,9 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						String submissionStatus = getSubmissionStatus(item.getExternalId());
 						// HandleSubmissionStatus returns a state string used for success tracking
 						String submissionState = handleSubmissionStatus(submissionStatus, item, assignment);
-						if (submissionState != null && "complete".equals(submissionState)) {
+						if (COMPLETE_STATE.equals(submissionState)) {
 							success++;
-						} else if (submissionState != null && "error".equals(submissionState)) {
+						} else if (ERROR_STATE.equals(submissionState)) {
 							errors++;
 						}
 					} catch (Exception e) {
@@ -1115,14 +1120,14 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						&& assignmentDueDate.after(new Date())) {
 					createPlaceholderItem(item, assignmentDueDate);
 				}
-				submissionState = "complete";
+				submissionState = COMPLETE_STATE;
 				break;
 			case "PROCESSING":
 				// do nothing... try again
-				submissionState = "processing";
+				submissionState = PROCESSING_STATE;
 				break;
 			case "CREATED":
-				submissionState = "created";
+				submissionState = PROCESSING_STATE;
 				// do nothing... try again
 				break;
 			case "UNSUPPORTED_FILETYPE":
@@ -1157,11 +1162,11 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				item.setLastError(errorStr);
 				item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMISSION_ERROR_NO_RETRY_CODE);
 				crqs.update(item);
-				submissionState = "error";
+				submissionState = ERROR_STATE;
 			}
 		}  catch (Exception e) {
 			log.error(e.getMessage(), e);
-			submissionState = "error";
+			submissionState = ERROR_STATE;
 		}
 		return submissionState;
 	}
@@ -1180,13 +1185,13 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			item.setLastError(null);
 			item.setErrorCode(null);			
 			crqs.update(item);
-			reportState = "complete";
+			reportState = COMPLETE_STATE;
 		} else if (status == -1) {
 			// Similarity report is still generating, will try again
 			log.info("Processing report " + item.getExternalId() + "...");
-			reportState = "processing";
+			reportState = PROCESSING_STATE;
 		} else if(status == -2){
-			reportState = "error";
+			reportState = ERROR_STATE;
 			throw new Error("Unknown error during report status call");
 		}
 		return reportState;
@@ -1343,9 +1348,9 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
 						Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));						
 						String submissionState = handleSubmissionStatus(webhookJSON.getString("status"), item, assignment);
-						if (submissionState != null && "complete".equals(submissionState)) {
+						if (COMPLETE_STATE.equals(submissionState)) {
 							success++;
-						} else if (submissionState != null && "error".equals(submissionState)) {
+						} else if (ERROR_STATE.equals(submissionState)) {
 							errors++;
 						}
 					} else {
@@ -1361,8 +1366,10 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), webhookJSON.getString("submission_id"));
 						ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
 						String reportState = handleReportStatus(item, webhookJSON.getInt("overall_match_percentage"));
-						if (reportState != null && "complete".equals(reportState)) {
+						if (COMPLETE_STATE.equals(reportState)) {
 							success++;
+						} else if (ERROR_STATE.equals(reportState)) {
+							errors++;
 						}
 					} else {
 						log.warn("Callback item received without needed information");
