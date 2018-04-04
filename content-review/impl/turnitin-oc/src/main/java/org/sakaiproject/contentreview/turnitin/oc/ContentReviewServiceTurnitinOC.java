@@ -674,7 +674,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	// Stage one creates a submission, uploads submission contents to TCA and sets item externalId
 	// Stage two starts similarity report process
 	// Stage three checks status of similarity reports and retrieves report score
-	// Loop 1 contains stage one and two, Loop 2 contains stage three
+	// processUnsubmitted contains stage one and two, checkForReport contains stage three
 	public void processQueue() {
 		log.info("Processing Turnitin OC submission queue");
 		// Create new session object to ensure permissions are carried correctly to each new thread
@@ -791,7 +791,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 								referenceItem.setReviewScore(null);
 								referenceItem.setNextRetryTime(new Date());
 								crqs.update(referenceItem);
-								// Report regenerated for reference item, placeholder item is no longer needed
+								// Report regenerated for reference item, draft placeholder item is no longer needed
 								crqs.delete(item);
 								success++;
 								continue;
@@ -825,7 +825,10 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				// Returns -2 if an error occurs
 				// Else returns reports score as integer																	
 				int status = getSimilarityReportStatus(item.getExternalId());
-				handleReportStatus(item, status);					
+				String reportState = handleReportStatus(item, status);
+				if (reportState != null && "complete".equals(reportState)) {
+					success++;
+				}
 
 			} catch (Exception e) {
 				log.error(e.getLocalizedMessage(), e);
@@ -854,12 +857,11 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 					errors++;
 					continue;
 				}						
-				// Handle drafts and items that only generate reports on due date				
+				// Handle items that only generate reports on due date
 				// Get assignment associated with current item's task Id
 				Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
 				Date assignmentDueDate = null;
 				String reportGenSpeed = null;
-				Boolean isDraft = null;
 				if(assignment != null) {
 					assignmentDueDate = Date.from(assignment. getDueDate());					
 					reportGenSpeed = assignment.getProperties().get("report_gen_speed");														
@@ -876,6 +878,19 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						continue;
 					}
 				}
+				// Delete drafts that are not not submitted to TCA and flag drafts that are
+				Boolean generateReportForDraft = null;
+				if(checkForDraft(item, assignment)) {
+					if("true".equals(assignment.getProperties().get("draft_check"))) {
+						generateReportForDraft = true;
+					}
+					else {
+						// Drafts are not submitted, item can be deleted
+						crqs.delete(item);
+						continue;
+					}
+				}
+
 				//Paper is ready to be submitted
 				ContentResource resource = null;
 				try {
@@ -920,13 +935,13 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						fileName += HTML_EXTENSION;
 					}
 					
-					// TODO Find better draft flag to do this
-					if(flagDraftSubmissions(item, assignment)) {
-						// Flag Draft 
-						item.setReviewScore(DRAFT_ITEM_REVIEW_SCORE);						
-						// Create placeholder to index drafts after Due Date
-						createDraftPlaceholderItem(item, assignmentDueDate);		 							
-					}
+					// handle drafts that need submitted to TCA
+					if(generateReportForDraft != null && generateReportForDraft.equals(true)) {
+							// Flag Draft for index settings
+							item.setReviewScore(DRAFT_ITEM_REVIEW_SCORE);
+							// Create placeholder to index drafts after Due Date
+							createDraftPlaceholderItem(item, assignmentDueDate);
+						}
 					
 					try {
 						log.info("Submission starting...");
@@ -967,8 +982,13 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 					try {
 						// Get submission status, returns the state of the submission as string		
 						String submissionStatus = getSubmissionStatus(item.getExternalId());
-						handleSubmissionStatus(submissionStatus, item, assignment);						
-						
+						// HandleSubmissionStatus returns a state string used for success tracking
+						String submissionState = handleSubmissionStatus(submissionStatus, item, assignment);
+						if (submissionState != null && "complete".equals(submissionState)) {
+							success++;
+						} else if (submissionState != null && "error".equals(submissionState)) {
+							errors++;
+						}
 					} catch (Exception e) {
 						log.error(e.getMessage(), e);
 						item.setLastError(e.getMessage());
@@ -996,7 +1016,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		return cal.getTime();
 	}
 	
-	private boolean flagDraftSubmissions(ContentReviewItem item, Assignment assignment) {
+	private boolean checkForDraft(ContentReviewItem item, Assignment assignment) {
 		// Checks if current item is a draft or submitted
 		try {
 			AssignmentSubmission currentSubmission = assignmentService.getSubmission(assignment.getId(), item.getUserId());		
@@ -1009,13 +1029,9 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		}		
 	}
 	
-	private boolean checkForDraft(ContentReviewItem item, Assignment assignment) {
-		// Checks if current item is a draft or submitted
+	private boolean checkForDraftFlag(ContentReviewItem item) {
+		// Checks if current item is a draft or submitted by it's review score, does not require access to assignmentService
 		try {
-//			if ()
-//			AssignmentSubmission currentSubmission = assignmentService.getSubmission(assignment.getId(), item.getUserId());		
-			// Drafts return true, final submissions return false, if null return false						
-//			return Optional.ofNullable(item.getExternalId().endsWith(DRAFT_EXTENSION)).orElse(false);
 			return DRAFT_ITEM_REVIEW_SCORE.equals(item.getReviewScore());
 		} catch (Exception e) {				
 			log.error(e.getMessage(), e);
@@ -1029,7 +1045,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		ContentReviewItem draftPlaceholderItem = new ContentReviewItem();
 		draftPlaceholderItem.setReviewScore(DRAFT_PLACEHOLDER_ITEM_REVIEW_SCORE);
 		draftPlaceholderItem.setContentId(item.getContentId() + DRAFT_PLACEHOLDER_STRING_FLAG);
-		draftPlaceholderItem.setExternalId(item.getExternalId() + PLACEHOLDER_STRING_FLAG);
+		draftPlaceholderItem.setExternalId(DRAFT_PLACEHOLDER_STRING_FLAG);
 		draftPlaceholderItem.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
 		draftPlaceholderItem.setNextRetryTime(getDueDateRetryTime(dueDate));
 		draftPlaceholderItem.setDateQueued(new Date());
@@ -1065,10 +1081,10 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		crqs.update(placeholderItem);
 	}						
 	
-	private void handleSubmissionStatus(String submissionStatus, ContentReviewItem item, Assignment assignment) {
-		
+	private String handleSubmissionStatus(String submissionStatus, ContentReviewItem item, Assignment assignment) {
+		String submissionState = null;
 		try {
-			
+
 			Date assignmentDueDate = Date.from(assignment.getDueDate());
 			String reportGenSpeed = assignment.getProperties().get("report_gen_speed");
 			
@@ -1078,8 +1094,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			switch (submissionStatus) {
 			case "COMPLETE":
 				// If submission status is complete, start similarity report process
-				generateSimilarityReport(item.getExternalId(), item.getTaskId(), checkForDraft(item, assignment));
-				// Reset draft placeholder review score, possible problem?
+				generateSimilarityReport(item.getExternalId(), item.getTaskId(), checkForDraftFlag(item));
+				// Make sure any draft items scores are reset to null
 				item.setReviewScore(null);
 				// Update item status for loop 2
 				item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_AWAITING_REPORT_CODE);
@@ -1093,18 +1109,20 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				// Schedule next retry time
 				item.setNextRetryTime(cal.getTime());
 				crqs.update(item);
-//				success++;
 				// Check for items that generate reports both immediately and on due date
 				// Create a placeholder item that will regenerate report score after due date
 				if (assignmentDueDate != null && GENERATE_REPORTS_IMMEDIATELY_AND_ON_DUE_DATE.equals(reportGenSpeed)
 						&& assignmentDueDate.after(new Date())) {
 					createPlaceholderItem(item, assignmentDueDate);
-				}							
+				}
+				submissionState = "complete";
 				break;
 			case "PROCESSING":
 				// do nothing... try again
+				submissionState = "processing";
 				break;
 			case "CREATED":
+				submissionState = "created";
 				// do nothing... try again
 				break;
 			case "UNSUPPORTED_FILETYPE":
@@ -1139,16 +1157,18 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				item.setLastError(errorStr);
 				item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMISSION_ERROR_NO_RETRY_CODE);
 				crqs.update(item);
-//				errors++;
+				submissionState = "error";
 			}
 		}  catch (Exception e) {
 			log.error(e.getMessage(), e);
+			submissionState = "error";
 		}
-		
+		return submissionState;
 	}
 	
-	private void handleReportStatus(ContentReviewItem item, int status) {
-
+	private String handleReportStatus(ContentReviewItem item, int status) {
+		// return reportState to keep track of successful submissions
+		String reportState = null;
 		// Any status above -1 is the report score
 		if (status > -1) {					
 			log.info("Report complete! Score: " + status);
@@ -1160,12 +1180,16 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			item.setLastError(null);
 			item.setErrorCode(null);			
 			crqs.update(item);
+			reportState = "complete";
 		} else if (status == -1) {
 			// Similarity report is still generating, will try again
 			log.info("Processing report " + item.getExternalId() + "...");
+			reportState = "processing";
 		} else if(status == -2){
+			reportState = "error";
 			throw new Error("Unknown error during report status call");
 		}
+		return reportState;
 	}
 	
 	public boolean incrementItem(ContentReviewItem item) {
@@ -1274,6 +1298,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	@Override
 	public void webhookEvent(HttpServletRequest request, String providerName, Optional<String> customParam) {
 		log.info("providerName: " + providerName + ", custom: " + (customParam.isPresent() ? customParam.get() : ""));
+		int errors = 0;
+		int success = 0;
 		String body = null;
 		StringBuilder stringBuilder = new StringBuilder();
 		BufferedReader bufferedReader = null;
@@ -1292,12 +1318,14 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			}
 		} catch (Exception e) {
 			log.error(e.getMessage(), e);
+			errors++;
 		} finally {
 			if (bufferedReader != null) {
 				try {
 					bufferedReader.close();
 				} catch (Exception e) {
 					log.error(e.getMessage(), e);
+					errors++;
 				}
 			}
 		}
@@ -1314,9 +1342,15 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), webhookJSON.getString("id"));
 						ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
 						Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));						
-						handleSubmissionStatus(webhookJSON.getString("status"), item, assignment);					
+						String submissionState = handleSubmissionStatus(webhookJSON.getString("status"), item, assignment);
+						if (submissionState != null && "complete".equals(submissionState)) {
+							success++;
+						} else if (submissionState != null && "error".equals(submissionState)) {
+							errors++;
+						}
 					} else {
-						log.warn("Callback item received without an id");
+						log.warn("Callback item received needed information");
+						errors++;
 					}
 					
 				}
@@ -1326,17 +1360,21 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						log.info(webhookJSON.toString());
 						Optional<ContentReviewItem> optionalItem = crqs.getQueuedItemByExternalId(getProviderId(), webhookJSON.getString("submission_id"));
 						ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
-						// Make sure to set item score to null at this point, since overall_match_percentage is finalized 
-						item.setReviewScore(null);
-						handleReportStatus(item, webhookJSON.getInt("overall_match_percentage"));															
+						String reportState = handleReportStatus(item, webhookJSON.getInt("overall_match_percentage"));
+						if (reportState != null && "complete".equals(reportState)) {
+							success++;
+						}
 					} else {
-						log.warn("Callback item received without a submission id");
+						log.warn("Callback item received without needed information");
+						errors++;
 					}
 				}
 				
 			} catch (Exception e) {
 				log.error(e.getLocalizedMessage(), e);
+				errors++;
 			}
+			log.info("Turnitin webhook received: " + success + " items processed, " + errors + " errors.");
 	}
 	
 	@Getter
