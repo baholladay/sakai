@@ -121,7 +121,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	private static final String HEADER_CONTENT = "Content-Type";
 	private static final String HEADER_DISP = "Content-Disposition";
 	
-	private static final String HTML_EXTENSION = ".HTML";
+	private static final String HTML_EXTENSION = ".html";
 
 	private static final String STATUS_CREATED = "CREATED";
 	private static final String STATUS_COMPLETE = "COMPLETE";
@@ -820,7 +820,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						crqs.delete(item);
 						errors++;
 						continue;
-					}				
+					}
 				}
 				
 				// Get status of similarity report
@@ -844,7 +844,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		}
 		log.info("Turnitin report queue run completed: " + success + " items submitted, " + errors + " errors.");		
 	}
-
+	
 	public void processUnsubmitted() {
 		// Submission process phase 1
 		// 1. Establish submission object, get ID
