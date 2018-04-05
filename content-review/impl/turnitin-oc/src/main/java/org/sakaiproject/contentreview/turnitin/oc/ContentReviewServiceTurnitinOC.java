@@ -884,9 +884,9 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 					}
 				}
 				// Delete drafts that are not not submitted to TCA and flag drafts that are
-				Boolean generateReportForDraft = null;
+				boolean generateReportForDraft = false;
 				if(checkForDraft(item, assignment)) {
-					if("true".equals(assignment.getProperties().get("draft_check"))) {
+					if("true".equals(assignment.getProperties().get("report_gen_draft"))) {
 						generateReportForDraft = true;
 					}
 					else {
@@ -941,7 +941,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 					}
 					
 					// handle drafts that need submitted to TCA
-					if(generateReportForDraft != null && generateReportForDraft.equals(true)) {
+					if(generateReportForDraft) {
 							// Flag Draft for index settings
 							item.setReviewScore(DRAFT_ITEM_REVIEW_SCORE);
 							// Create placeholder to index drafts after Due Date
