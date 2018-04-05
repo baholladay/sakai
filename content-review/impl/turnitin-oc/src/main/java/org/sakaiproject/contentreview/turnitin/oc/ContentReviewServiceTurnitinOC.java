@@ -60,7 +60,6 @@ import org.sakaiproject.contentreview.exception.TransientSubmissionException;
 import org.sakaiproject.contentreview.service.BaseContentReviewService;
 import org.sakaiproject.contentreview.service.ContentReviewQueueService;
 import org.sakaiproject.entity.api.EntityManager;
-import org.sakaiproject.entity.api.Reference;
 import org.sakaiproject.entity.api.ResourceProperties;
 import org.sakaiproject.exception.IdUnusedException;
 import org.sakaiproject.exception.PermissionException;
@@ -123,7 +122,6 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	private static final String HEADER_DISP = "Content-Disposition";
 	
 	private static final String HTML_EXTENSION = ".HTML";
-	private static final String DRAFT_EXTENSION = ".draft";
 
 	private static final String STATUS_CREATED = "CREATED";
 	private static final String STATUS_COMPLETE = "COMPLETE";
@@ -726,7 +724,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 					continue;
 				}
 				// Check if any placeholder items need to regenerate report after due date
-				if (PLACEHOLDER_ITEM_REVIEW_SCORE.equals(item.getReviewScore())) {	
+				if (PLACEHOLDER_ITEM_REVIEW_SCORE.equals(item.getReviewScore())) {
+					// Get assignment associated with current item's task Id
 					Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
 					Date assignmentDueDate = Date.from(assignment.getDueDate());
 					if(assignment != null && assignmentDueDate != null ) {
@@ -756,7 +755,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 								// Placeholder item is no longer needed
 								crqs.delete(item);
 								errors++;
-								continue;
+								continue;			
 							}
 						} else {
 							// We don't want placeholder items to exceed retry count maximum
@@ -765,7 +764,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 							item.setNextRetryTime(getDueDateRetryTime(assignmentDueDate));
 							crqs.update(item);
 							continue;
-						}					
+						}
 					}else {
 						// Assignment or due date no longer exist
 						// placeholder item is no longer needed
@@ -845,7 +844,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		}
 		log.info("Turnitin report queue run completed: " + success + " items submitted, " + errors + " errors.");		
 	}
-		
+
 	public void processUnsubmitted() {
 		// Submission process phase 1
 		// 1. Establish submission object, get ID
@@ -862,15 +861,14 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 					errors++;
 					continue;
 				}						
-				// Handle items that only generate reports on due date
+				// Handle items that only generate reports on due date				
 				// Get assignment associated with current item's task Id
 				Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
 				Date assignmentDueDate = null;
 				String reportGenSpeed = null;
 				if(assignment != null) {
 					assignmentDueDate = Date.from(assignment. getDueDate());					
-					reportGenSpeed = assignment.getProperties().get("report_gen_speed");														
-					
+					reportGenSpeed = assignment.getProperties().get("report_gen_speed");
 					// If report gen speed is set to due date, and it's before the due date right now, do not process item
 					if (assignmentDueDate != null && GENERATE_REPORTS_ON_DUE_DATE.equals(reportGenSpeed) 
 							&& assignmentDueDate.after(new Date())) {
