@@ -20,6 +20,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -39,10 +40,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import java.util.Base64;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang.StringUtils;
 import org.sakaiproject.assignment.api.AssignmentConstants;
 import org.sakaiproject.assignment.api.AssignmentService;
@@ -155,6 +161,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	private HashMap<String, String> CONTENT_UPLOAD_HEADERS = new HashMap<String, String>();
 	private HashMap<String, String> WEBHOOK_SETUP_HEADERS = new HashMap<String, String>();
 
+	byte[] signing_secret = "my-super-secret-secret".getBytes();
+
 	public void init() {
 		// Retrieve Service URL and API key
 		serviceUrl = serverConfigurationService.getString("turnitin.oc.serviceUrl", "");
@@ -186,7 +194,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		try {
 			// Get the webhook url
 //			String webhookUrl = getWebhookUrl(Optional.empty());
-			String webhookUrl = "https://b10266d9.ngrok.io/content-review-tool/webhooks?providerName=TurnitinOC";
+			String webhookUrl = "https://af44ad88.ngrok.io/content-review-tool/webhooks?providerName=TurnitinOC";
 			boolean webhooksSetup = false;
 			// Check to see if any webhooks have already been set up for this url
 			for (Webhook webhook : getWebhooks()) {
@@ -207,6 +215,9 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 	public String setupWebhook(String webhookUrl) throws Exception {
 		String id;
+		// Using python TCA example as guide here
+		String utf_8_signing_secret = new String(signing_secret, "UTF-8");
+		String singing_secret_encoded = base64Encode(utf_8_signing_secret);
 
 		Map<String, Object> data = new HashMap<String, Object>();
 
@@ -214,7 +225,8 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		types.add("SIMILARITY_COMPLETE");
 		types.add("SUBMISSION_COMPLETE");
 
-		data.put("signing_secret", apiKey);
+//		data.put("signing_secret", apiKey);
+		data.put("signing_secret", singing_secret_encoded);
 		data.put("url", webhookUrl);
 		data.put("description", "Sakai " + sakaiVersion);
 		data.put("allow_insecure", false);
@@ -1336,8 +1348,22 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		body = stringBuilder.toString();		
 		JSONObject webhookJSON = JSONObject.fromObject(body);
 		String eventType = request.getHeader("X-Turnitin-Eventtype");
+		String signature_header = request.getHeader("X-Turnitin-Signature");
 		
-			try {				
+		// Make sure cb is signed correctly
+		boolean callback_correctly_signed = false;
+		try {
+			String secrete_key_signed_signature = getSigningSignature(signing_secret, body);
+			if (secrete_key_signed_signature != null && signature_header.equals(secrete_key_signed_signature)) {
+				callback_correctly_signed = true;
+			}
+		} catch (Exception e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+
+		if (callback_correctly_signed) {
+			try {
 				if (eventType.equals("SUBMISSION_COMPLETE")) {
 					if (webhookJSON.has("id") && webhookJSON.get("status").equals("COMPLETE")) {
 						log.info("Submission complete webhook cb received");
@@ -1355,7 +1381,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						log.warn("Callback item received needed information");
 						errors++;
 					}
-					
+
 				}
 				if (eventType.equals("SIMILARITY_COMPLETE")) {
 					if (webhookJSON.has("submission_id") && webhookJSON.get("status").equals("COMPLETE")) {						
@@ -1374,14 +1400,35 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						errors++;
 					}
 				}
-				
+
 			} catch (Exception e) {
 				log.error(e.getLocalizedMessage(), e);
 				errors++;
 			}
-			log.info("Turnitin webhook received: " + success + " items processed, " + errors + " errors.");
+
+		} else {
+			log.warn("Callback signatures did not match");
+			errors++;
+		}
+		log.info("Turnitin webhook received: " + success + " items processed, " + errors + " errors.");
+	}
+
+	public static String getSigningSignature(byte[] key, String data) throws Exception {
+		Mac sha256_HMAC = Mac.getInstance("HmacSHA256");
+		SecretKeySpec secret_key = new SecretKeySpec(key, "HmacSHA256");
+		sha256_HMAC.init(secret_key);
+		return Hex.encodeHexString(sha256_HMAC.doFinal(data.getBytes("UTF-8")));
 	}
 	
+	public static byte[] base64Decode(String src) throws UnsupportedEncodingException {
+		return Base64.getDecoder().decode(src);
+	}
+
+	public static String base64Encode(String src) {
+		return Base64.getEncoder().encodeToString(src.getBytes());
+	}
+
+
 	@Getter
 	@AllArgsConstructor
 	private class Webhook {
