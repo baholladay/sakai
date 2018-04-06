@@ -893,19 +893,6 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						continue;
 					}
 				}
-				// Delete drafts that are not not submitted to TCA and flag drafts that are
-				boolean generateReportForDraft = false;
-				if(checkForDraft(item, assignment)) {
-					if("true".equals(assignment.getProperties().get("report_gen_draft"))) {
-						generateReportForDraft = true;
-					}
-					else {
-						// Drafts are not submitted, item can be deleted
-						crqs.delete(item);
-						continue;
-					}
-				}
-
 				//Paper is ready to be submitted
 				ContentResource resource = null;
 				try {
@@ -950,6 +937,19 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						fileName += HTML_EXTENSION;
 					}
 					
+					// Delete drafts that are not not submitted to TCA and flag drafts that are
+					boolean generateReportForDraft = false;
+					if(checkForDraft(item, assignment)) {
+						if("true".equals(assignment.getProperties().get("report_gen_draft"))) {
+							generateReportForDraft = true;
+						}
+						else {
+							// Drafts are not submitted, item can be deleted
+							crqs.delete(item);
+							continue;
+						}
+					}
+
 					// handle drafts that need submitted to TCA
 					if(generateReportForDraft) {
 							// Flag Draft for index settings
