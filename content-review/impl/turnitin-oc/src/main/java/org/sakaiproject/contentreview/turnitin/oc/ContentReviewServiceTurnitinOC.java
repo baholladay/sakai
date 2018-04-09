@@ -105,7 +105,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	@Setter
 	private SessionManager sessionManager;
 
-	private static final String SERVICE_NAME = "Turnitin Originality Check";
+	private static final String SERVICE_NAME = "TurnitinOC";
 	private static final String TURNITIN_OC_API_VERSION = "v1";
 	private static final int TURNITIN_OC_MAX_RETRY_MINUTES = 240; // 4 hours
 	private static final int TURNITIN_MAX_RETRY = 16;
