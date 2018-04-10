@@ -15,6 +15,7 @@
  */
 package org.sakaiproject.contentreview.service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -25,9 +26,9 @@ import java.util.Optional;
 import java.util.SortedSet;
 import java.util.stream.Collectors;
 
-import lombok.extern.slf4j.Slf4j;
+import javax.servlet.http.HttpServletRequest;
+
 import org.apache.commons.lang.StringUtils;
-import org.sakaiproject.component.api.ServerConfigurationService;
 import org.sakaiproject.content.api.ContentResource;
 import org.sakaiproject.contentreview.dao.ContentReviewItem;
 import org.sakaiproject.contentreview.exception.ContentReviewProviderException;
@@ -40,15 +41,13 @@ import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.tool.api.ToolManager;
 
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 
 /* This class is passed a list of providers in the bean as references, it will use the first
  * by default unless overridden by a site property.
  */
 @Slf4j
-public class ContentReviewFederatedServiceImpl implements ContentReviewService {
-
-	@Setter
-	private ServerConfigurationService serverConfigurationService;
+public class ContentReviewFederatedServiceImpl extends BaseContentReviewService {
 
 	@Setter
 	private ToolManager toolManager;
@@ -262,4 +261,38 @@ public class ContentReviewFederatedServiceImpl implements ContentReviewService {
 		return getSelectedProvider().getContentReviewItemByContentId(arg0);
 	}
 
+	@Override
+	public String getEndUserLicenseAgreementLink() {
+		return getSelectedProvider().getEndUserLicenseAgreementLink();
+	}
+
+	@Override
+	public Instant getEndUserLicenseAgreementTimestamp() {
+		return getSelectedProvider().getEndUserLicenseAgreementTimestamp();
+	}
+
+	@Override
+	public Instant getUserEULATimestamp(String userId) {
+		return getSelectedProvider().getUserEULATimestamp(userId);
+	}
+
+	@Override
+	public void updateUserEULATimestamp(String userId) {
+		getSelectedProvider().updateUserEULATimestamp(userId);
+	}
+
+	@Override
+	public String getEndUserLicenseAgreementVersion() {
+		return getSelectedProvider().getEndUserLicenseAgreementVersion();
+	}
+	
+	@Override
+	public String getReviewReportRedirectUrl(String contentId, String assignmentRef, String userId, boolean isInstructor) {
+		return getSelectedProvider().getReviewReportRedirectUrl(contentId, assignmentRef, userId, isInstructor);
+	}
+
+	@Override
+	public void webhookEvent(HttpServletRequest request, String providerName, Optional<String> customParam) {
+		providers.stream().filter(crs -> crs.getServiceName().equals(providerName)).collect(Collectors.toList()).get(0).webhookEvent(request, providerName, customParam);		
+	}
 }
