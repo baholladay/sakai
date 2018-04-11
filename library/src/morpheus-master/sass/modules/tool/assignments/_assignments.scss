@@ -405,6 +405,66 @@
 		color: #212121;
 	}
 
+	.contentReviewIconThreshold-1 {
+		@extend .contentReviewIcon;
+		color: #F44336;
+	}
+
+	.contentReviewIconThreshold-1-draft {
+		@extend .contentReviewIconDraft;
+		color: #F44336;
+	}
+
+	.contentReviewIconThreshold-2 {
+		@extend .contentReviewIcon;
+		color: #FF9800;
+	}
+
+	.contentReviewIconThreshold-2-draft {
+		@extend .contentReviewIconDraft;
+		color: #FF9800;
+	}
+
+	.contentReviewIconThreshold-3 {
+		@extend .contentReviewIcon;
+		color: #FFD600;
+	}
+
+	.contentReviewIconThreshold-3-draft {
+		@extend .contentReviewIconDraft;
+		color: #FFD600;
+	}
+
+	.contentReviewIconThreshold-4 {
+		@extend .contentReviewIcon;
+		color: #4CAF50;
+	}
+
+	.contentReviewIconThreshold-4-draft {
+		@extend .contentReviewIconDraft;
+		color: #4CAF50;
+	}
+
+	.contentReviewIconThreshold-5 {
+		@extend .contentReviewIcon;
+		color: #2196F3;
+	}
+
+	.contentReviewIconThreshold-5-draft {
+		@extend .contentReviewIconDraft;
+		color: #2196F3;
+	}
+
+	.contentReviewIconThreshold-6 {
+		@extend .contentReviewIcon;
+		color: #9E9E9E;
+	}
+
+	.contentReviewIconThreshold-6-draft {
+		@extend .contentReviewIconDraft;
+		color: #9E9E9E;
+	}
+
 	.contentReviewIconThreshold-100 {
 		@extend .contentReviewIcon;
 		color: #DB4221;
