@@ -430,18 +430,6 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	public Long getReviewStatus(String contentId) throws QueueException {
 		ContentReviewItem item = crqs.getQueuedItem(getProviderId(), contentId).get();
 		long status = item.getStatus();
-		if (status == 9) {
-			if (StringUtils.isEmpty(item.getExternalId())) {
-				item.setStatus((long) 1);
-			} else {
-				item.setStatus((long) 4);
-			}
-
-			item.setRetryCount((long) 0);
-			item.setLastError(null);
-			item.setNextRetryTime(Calendar.getInstance().getTime());
-			return (long) 4;
-		}
 		return status;
 	}
 
