@@ -315,17 +315,29 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	public String getIconCssClassforScore(int score, String contentId) {
 		String cssClass;
 		if (score < 0) {
-			cssClass = "contentReviewIconThreshold-6";
+			cssClass = "contentReviewIconThreshold-";
 		} else if (score == 0) {
-			cssClass = "contentReviewIconThreshold-5";
-		} else if (score < 25) {
-			cssClass = "contentReviewIconThreshold-4";
-		} else if (score < 50) {
-			cssClass = "contentReviewIconThreshold-3";
-		} else if (score < 75) {
-			cssClass = "contentReviewIconThreshold-2";
+			cssClass = "contentReviewIconThreshold-0";
+		} else if (score <= 10) {
+			cssClass = "contentReviewIconThreshold-10";
+		} else if (score <= 20) {
+			cssClass = "contentReviewIconThreshold-20";
+		} else if (score <= 30) {
+			cssClass = "contentReviewIconThreshold-30";
+		} else if (score <= 40) {
+			cssClass = "contentReviewIconThreshold-40";
+		} else if (score <= 50) {
+			cssClass = "contentReviewIconThreshold-50";
+		} else if (score <= 60) {
+			cssClass = "contentReviewIconThreshold-60";
+		} else if (score <= 70) {
+			cssClass = "contentReviewIconThreshold-70";
+		} else if (score <= 80) {
+			cssClass = "contentReviewIconThreshold-80";
+		} else if (score <= 90) {
+			cssClass = "contentReviewIconThreshold-90";
 		} else {
-			cssClass = "contentReviewIconThreshold-1";
+			cssClass = "contentReviewIconThreshold-100";
 		}
 
 		return cssClass;

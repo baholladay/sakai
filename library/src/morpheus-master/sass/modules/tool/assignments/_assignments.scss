@@ -465,6 +465,126 @@
 		color: #9E9E9E;
 	}
 
+	.contentReviewIconThreshold-100 {
+		@extend .contentReviewIcon;
+		color: #DB4221;
+	}
+
+	.contentReviewIconThreshold-100-draft {
+		@extend .contentReviewIconDraft;
+		color: #DB4221;
+	}
+
+	.contentReviewIconThreshold-90 {
+		@extend .contentReviewIcon;
+		color: #DC4321;
+	}
+
+	.contentReviewIconThreshold-90-draft {
+		@extend .contentReviewIconDraft;
+		color: #DC4321;
+	}
+
+	.contentReviewIconThreshold-80 {
+		@extend .contentReviewIcon;
+		color: #E05A21;
+	}
+
+	.contentReviewIconThreshold-80-draft {
+		@extend .contentReviewIconDraft;
+		color: #E05A21;
+	}
+
+	.contentReviewIconThreshold-70 {
+		@extend .contentReviewIcon;
+		color: #E15A21;
+	}
+
+	.contentReviewIconThreshold-70-draft {
+		@extend .contentReviewIconDraft;
+		color: #E15A21;
+	}
+
+	.contentReviewIconThreshold-60 {
+		@extend .contentReviewIcon;
+		color: #EDAC28;
+	}
+
+	.contentReviewIconThreshold-60-draft {
+		@extend .contentReviewIconDraft;
+		color: #EDAC28;
+	}
+
+	.contentReviewIconThreshold-50 {
+		@extend .contentReviewIcon;
+		color: #ECAD28;
+	}
+
+	.contentReviewIconThreshold-50-draft {
+		@extend .contentReviewIconDraft;
+		color: #ECAD28;
+	}
+
+	.contentReviewIconThreshold-40 {
+		@extend .contentReviewIcon;
+		color: #EDD42F;
+	}
+
+	.contentReviewIconThreshold-40-draft {
+		@extend .contentReviewIconDraft;
+		color: #EDD42F;
+	}
+
+	.contentReviewIconThreshold-30 {
+		@extend .contentReviewIcon;
+		color: #DAE235;
+	}
+
+	.contentReviewIconThreshold-30-draft {
+		@extend .contentReviewIconDraft;
+		color: #DAE235;
+	}
+
+	.contentReviewIconThreshold-20 {
+		@extend .contentReviewIcon;
+		color: #A1B556;
+	}
+
+	.contentReviewIconThreshold-20-draft {
+		@extend .contentReviewIconDraft;
+		color: #A1B556;
+	}
+
+	.contentReviewIconThreshold-10 {
+		@extend .contentReviewIcon;
+		color: #617B8D;
+	}
+
+	.contentReviewIconThreshold-10-draft {
+		@extend .contentReviewIconDraft;
+		color: #617B8D;
+	}
+
+	.contentReviewIconThreshold-0 {
+		@extend .contentReviewIcon;
+		color: #3552B7;
+	}
+
+	.contentReviewIconThreshold-0-draft {
+		@extend .contentReviewIconDraft;
+		color: #3552B7;
+	}
+
+	.contentReviewIconThreshold- {
+		@extend .contentReviewIcon;
+		color: #999999;
+	}
+
+	.contentReviewIconThreshold-draft {
+		@extend .contentReviewIconDraft;
+		color: #999999;
+	}
+
 	div#pagingHeader {
 		height: 20px;
 		padding: 15px;
