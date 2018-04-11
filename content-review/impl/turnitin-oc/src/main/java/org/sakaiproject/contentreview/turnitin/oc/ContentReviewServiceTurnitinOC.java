@@ -684,7 +684,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		executor.shutdown();
 		// wait:
 		try {
-			if (!executor.awaitTermination(30, TimeUnit.MINUTES)){
+			if (!executor.awaitTermination(30, TimeUnit.MINUTES)) {
 				log.error("ContentReviewServiceTurnitinOC.processQueue: time out waiting for executor to complete");
 			}
 		} catch (InterruptedException e) {
@@ -776,7 +776,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				} else if (status == -1) {
 					// Similarity report is still generating, will try again
 					log.info("Processing report " + item.getExternalId() + "...");
-				} else if (status == -2){
+				} else if (status == -2) {
 					throw new Error("Unknown error during report status call");
 				}
 
