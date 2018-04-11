@@ -366,11 +366,11 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			try {
 				//Get report owner user information
 				String givenName = "", familyName = "";
-				try {
+				try{
 					User user = userDirectoryService.getUser(item.getUserId());
 					givenName = user.getFirstName();
 					familyName = user.getLastName();
-				} catch (Exception e) {
+				}catch (Exception e) {
 					log.error(e.getMessage(), e);
 				}
 				Map<String, Object> data = new HashMap<String, Object>();
@@ -413,7 +413,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			} catch (Exception e) {
 				log.error(e.getLocalizedMessage(), e);
 			}
-		} else {
+		}else {
 			// Only generate viewerUrl if report is available
 			log.info("Content review item is not ready for the report: " + contentId + ", " + (item != null ? item.getStatus() : ""));
 		}
@@ -428,9 +428,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	}
 
 	public Long getReviewStatus(String contentId) throws QueueException {
-		ContentReviewItem item = crqs.getQueuedItem(getProviderId(), contentId).get();
-		long status = item.getStatus();
-		return status;
+		return crqs.getReviewStatus(getProviderId(), contentId);
 	}
 
 	public String getServiceName() {
@@ -973,7 +971,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						}
 						if(StringUtils.isNotEmpty(errorStr)) {
 							item.setLastError(errorStr);
-							item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMISSION_ERROR_RETRY_CODE);
+							item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMISSION_ERROR_NO_RETRY_CODE);
 							crqs.update(item);
 							errors++;
 						}
