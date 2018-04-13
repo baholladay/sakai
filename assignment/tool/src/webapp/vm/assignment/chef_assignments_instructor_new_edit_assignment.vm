@@ -1061,6 +1061,25 @@
 								#end
 							</div>
 						#end
+						#if($show_NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_DRAFT)
+							<div>
+								<label>$tlang.getString("review.originality.drafts")</label>
+							</div>
+							<div class="well" style="display:inline-block">
+								#if($show_NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_DRAFT)
+									<div class="checkbox">
+										<label for="$name_NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_DRAFT">
+										#if ($!value_NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_DRAFT.equals("true"))
+											<input id="$name_NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_DRAFT" name="$name_NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_DRAFT" type="checkbox" value="true" checked="checked" />
+										#else
+											<input id="$name_NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_DRAFT" name="$name_NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_DRAFT" type="checkbox" value="true" />
+										#end
+											$tlang.getString("review.originality.check.draft")
+										</label>
+									</div>
+								#end
+							</div>
+						#end
 						#if($show_NEW_ASSIGNMENT_REVIEW_SERVICE_STORE_INST_INDEX)
 							<div>
 								<label>$tlang.getString("review.store.matches.header")</label>
