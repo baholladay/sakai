@@ -20,13 +20,12 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -40,15 +39,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import java.util.Base64;
-
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.http.HttpServletRequest;
 
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang.StringUtils;
 import org.sakaiproject.assignment.api.AssignmentConstants;
 import org.sakaiproject.assignment.api.AssignmentService;
@@ -143,7 +140,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	private static final String GENERATE_REPORTS_ON_DUE_DATE = "2";	
 	private static final String PLACEHOLDER_STRING_FLAG = "_placeholder";
 	private static final Integer PLACEHOLDER_ITEM_REVIEW_SCORE = -10;
-	private static final String DRAFT_PLACEHOLDER_STRING_FLAG = "draft";
+	private static final String DRAFT_PLACEHOLDER_STRING_FLAG = "_draft";
 	private static final Integer DRAFT_ITEM_REVIEW_SCORE = -15;
 	private static final Integer DRAFT_PLACEHOLDER_ITEM_REVIEW_SCORE = -20;
 
@@ -161,7 +158,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	private HashMap<String, String> CONTENT_UPLOAD_HEADERS = new HashMap<String, String>();
 	private HashMap<String, String> WEBHOOK_SETUP_HEADERS = new HashMap<String, String>();
 
-	byte[] signing_secret = "my-super-secret-secret".getBytes();
+
 
 	public void init() {
 		// Retrieve Service URL and API key
@@ -193,8 +190,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 		try {
 			// Get the webhook url
-//			String webhookUrl = getWebhookUrl(Optional.empty());
-			String webhookUrl = "https://e5df31ec.ngrok.io/content-review-tool/webhooks?providerName=TurnitinOC";
+			String webhookUrl = getWebhookUrl(Optional.empty());
 			boolean webhooksSetup = false;
 			// Check to see if any webhooks have already been set up for this url
 			for (Webhook webhook : getWebhooks()) {
@@ -215,18 +211,13 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 	public String setupWebhook(String webhookUrl) throws Exception {
 		String id;
-		// Using python TCA example as guide here
-		String utf_8_signing_secret = new String(signing_secret, "UTF-8");
-		String singing_secret_encoded = base64Encode(utf_8_signing_secret);
-
 		Map<String, Object> data = new HashMap<String, Object>();
 
 		List<String> types = new ArrayList<>();
 		types.add("SIMILARITY_COMPLETE");
 		types.add("SUBMISSION_COMPLETE");
 
-//		data.put("signing_secret", apiKey);
-		data.put("signing_secret", singing_secret_encoded);
+		data.put("signing_secret", base64Encode(apiKey));
 		data.put("url", webhookUrl);
 		data.put("description", "Sakai " + sakaiVersion);
 		data.put("allow_insecure", false);
@@ -1353,13 +1344,12 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		// Make sure cb is signed correctly
 		boolean callback_correctly_signed = false;
 		try {
-			String secrete_key_signed_signature = getSigningSignature(signing_secret, body);
-			if (secrete_key_signed_signature != null && signature_header.equals(secrete_key_signed_signature)) {
+			String secrete_key_encoded = getSigningSignature(apiKey.getBytes(), body);
+			if (secrete_key_encoded != null && signature_header.equals(secrete_key_encoded)) {
 				callback_correctly_signed = true;
 			}
 		} catch (Exception e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+			log.error(e1.getMessage(), e1);
 		}
 
 		if (callback_correctly_signed) {
@@ -1402,7 +1392,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				}
 
 			} catch (Exception e) {
-				log.error(e.getLocalizedMessage(), e);
+				log.error(e.getMessage(), e);
 				errors++;
 			}
 
@@ -1420,14 +1410,9 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		return Hex.encodeHexString(sha256_HMAC.doFinal(data.getBytes("UTF-8")));
 	}
 	
-	public static byte[] base64Decode(String src) throws UnsupportedEncodingException {
-		return Base64.getDecoder().decode(src);
-	}
-
 	public static String base64Encode(String src) {
 		return Base64.getEncoder().encodeToString(src.getBytes());
 	}
-
 
 	@Getter
 	@AllArgsConstructor
