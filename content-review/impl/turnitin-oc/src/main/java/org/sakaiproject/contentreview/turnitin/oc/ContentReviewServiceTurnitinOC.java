@@ -25,7 +25,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -90,7 +89,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 	@Setter
 	private SecurityService securityService;
-	
+
 	@Setter
 	private AssignmentService assignmentService;
 
@@ -102,7 +101,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 	@Setter
 	private ContentHostingService contentHostingService;
-	
+
 	@Setter
 	private SessionManager sessionManager;
 
@@ -119,19 +118,19 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	private static final String HEADER_AUTH = "Authorization";
 	private static final String HEADER_CONTENT = "Content-Type";
 	private static final String HEADER_DISP = "Content-Disposition";
-	
+
 	private static final String HTML_EXTENSION = ".html";
 
 	private static final String STATUS_CREATED = "CREATED";
 	private static final String STATUS_COMPLETE = "COMPLETE";
 	private static final String STATUS_PROCESSING = "PROCESSING";
-	
+
 	private static final String RESPONSE_CODE = "responseCode";
 	private static final String RESPONSE_MESSAGE = "responseMessage";
 	private static final String RESPONSE_BODY = "responseBody";
 	private static final String GIVEN_NAME = "given_name";
 	private static final String FAMILY_NAME = "family_name";
-	
+
 	private static final String GENERATE_REPORTS_IMMEDIATELY_AND_ON_DUE_DATE= "1";
 	private static final String GENERATE_REPORTS_ON_DUE_DATE = "2";	
 	private static final String PLACEHOLDER_STRING_FLAG = "_placeholder";
@@ -166,7 +165,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		// Populate similarity report headers used in generateSimilarityReport
 		SIMILARITY_REPORT_HEADERS.putAll(BASE_HEADERS);
 		SIMILARITY_REPORT_HEADERS.put(HEADER_CONTENT, CONTENT_TYPE_JSON);
-		
+
 		// Populate webhook generation headers used in setupWebhook
 		WEBHOOK_SETUP_HEADERS.putAll(BASE_HEADERS);
 		WEBHOOK_SETUP_HEADERS.put(HEADER_CONTENT, CONTENT_TYPE_JSON);
@@ -236,7 +235,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 		return id;
 	}
-	
+
 	public ArrayList<Webhook> getWebhooks() throws Exception {
 		ArrayList<Webhook> webhooks = new ArrayList<>();
 
@@ -263,7 +262,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				}
 			}
 		}
-		
+
 		return webhooks;
 	}
 
@@ -356,22 +355,22 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			throws QueueException, SubmissionException, ReportException {
 		return null;
 	}
-	
+
 	public String getReviewReportRedirectUrl(String contentId, String assignmentRef, String userId, boolean isInstructor) {
-		
+
 		// Set variables
 		String viewerUrl = null;
 		Optional<ContentReviewItem> optionalItem = crqs.getQueuedItem(getProviderId(), contentId);
 		ContentReviewItem item = optionalItem.isPresent() ? optionalItem.get() : null;
-		if(item != null && ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_REPORT_AVAILABLE_CODE.equals(item.getStatus())) {
+		if (item != null && ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_REPORT_AVAILABLE_CODE.equals(item.getStatus())) {
 			try {
 				//Get report owner user information
 				String givenName = "", familyName = "";
-				try{
+				try {
 					User user = userDirectoryService.getUser(item.getUserId());
 					givenName = user.getFirstName();
 					familyName = user.getLastName();
-				}catch (Exception e) {
+				} catch (Exception e) {
 					log.error(e.getMessage(), e);
 				}
 				Map<String, Object> data = new HashMap<String, Object>();
@@ -414,11 +413,11 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			} catch (Exception e) {
 				log.error(e.getLocalizedMessage(), e);
 			}
-		}else {
+		} else {
 			// Only generate viewerUrl if report is available
 			log.info("Content review item is not ready for the report: " + contentId + ", " + (item != null ? item.getStatus() : ""));
 		}
-	
+
 		return viewerUrl;
 	}
 
@@ -444,9 +443,9 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	public boolean isSiteAcceptable(Site arg0) {
 		return true;
 	}
-	
+
 	private HashMap<String, Object> makeHttpCall(String method, String urlStr, Map<String, String> headers,  Map<String, Object> data, byte[] dataBytes) 
-		throws IOException {
+			throws IOException {
 		// Set variables
 		HttpURLConnection connection = null;
 		DataOutputStream wr = null;
@@ -488,20 +487,20 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		int responseCode = connection.getResponseCode();
 		String responseMessage = connection.getResponseMessage();
 		String responseBody = IOUtils.toString(connection.getInputStream(), StandardCharsets.UTF_8);
-		
+
 		HashMap<String, Object> response = new HashMap<String, Object>();
 		response.put(RESPONSE_CODE, responseCode);
 		response.put(RESPONSE_MESSAGE, responseMessage);
 		response.put(RESPONSE_BODY, responseBody);
-		
+
 		return response;
 	}
 
 	private void generateSimilarityReport(String reportId, String assignmentRef) throws Exception {
-		
+
 		Assignment assignment = assignmentService.getAssignment(entityManager.newReference(assignmentRef));
 		Map<String, String> assignmentSettings = assignment.getProperties();
-		
+
 		List<String> repositories = new ArrayList<>();
 		if ("true".equals(assignmentSettings.get("internet_check"))) {
 			repositories.add("INTERNET");
@@ -512,7 +511,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		if ("true".equals(assignmentSettings.get("journal_check"))) {
 			repositories.add("JOURNAL");
 		}
-		
+
 		if (repositories.size() == 0) {
 			throw new Error("Cannot generate similarity report - at least one search repo must be selected");
 		}
@@ -527,18 +526,18 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		viewSettings.put("exclude_quotes", "true".equals(assignmentSettings.get("exclude_quoted")));
 		viewSettings.put("exclude_bibliography", "true".equals(assignmentSettings.get("exclude_biblio")));
 		reportData.put("view_settings", viewSettings);
-		
+
 		HashMap<String, Object> response = makeHttpCall("PUT",
-			getNormalizedServiceUrl() + "submissions/" + reportId + "/similarity",
-			SIMILARITY_REPORT_HEADERS,
-			reportData,
-			null);
-		
+				getNormalizedServiceUrl() + "submissions/" + reportId + "/similarity",
+				SIMILARITY_REPORT_HEADERS,
+				reportData,
+				null);
+
 		// Get response:
 		int responseCode = !response.containsKey(RESPONSE_CODE) ? 0 : (int) response.get(RESPONSE_CODE);
 		String responseMessage = !response.containsKey(RESPONSE_MESSAGE) ? "" : (String) response.get(RESPONSE_MESSAGE);
 		String responseBody = !response.containsKey(RESPONSE_BODY) ? "" : (String) response.get(RESPONSE_BODY);
-		
+
 		if ((responseCode >= 200) && (responseCode < 300)) {
 			log.debug("Successfully initiated Similarity Report generation.");
 		} else if ((responseCode == 409)) {
@@ -685,14 +684,14 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		executor.shutdown();
 		// wait:
 		try {
-			if(!executor.awaitTermination(30, TimeUnit.MINUTES)){
+			if (!executor.awaitTermination(30, TimeUnit.MINUTES)) {
 				log.error("ContentReviewServiceTurnitinOC.processQueue: time out waiting for executor to complete");
 			}
 		} catch (InterruptedException e) {
 			log.error(e.getMessage(), e);
 		}
 	}
-	
+
 	public void checkForReport() {
 		// Original file has been uploaded, and similarity report has been requested
 		// Check for status of report and return score
@@ -714,7 +713,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 					// Get assignment associated with current item's task Id
 					Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
 					Date assignmentDueDate = Date.from(assignment.getDueDate());
-					if(assignment != null && assignmentDueDate != null ) {
+					if (assignment != null && assignmentDueDate != null ) {
 						// Make sure due date is past						
 						if (assignmentDueDate.before(new Date())) {
 							// Regenerate similarity request 
@@ -750,7 +749,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 							crqs.update(item);
 							continue;
 						}					
-					}else {
+					} else {
 						// Assignment or due date no longer exist
 						// placeholder item is no longer needed
 						crqs.delete(item);
@@ -777,7 +776,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				} else if (status == -1) {
 					// Similarity report is still generating, will try again
 					log.info("Processing report " + item.getExternalId() + "...");
-				} else if(status == -2){
+				} else if (status == -2) {
 					throw new Error("Unknown error during report status call");
 				}
 
@@ -791,7 +790,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		}
 		log.info("Turnitin report queue run completed: " + success + " items submitted, " + errors + " errors.");		
 	}
-	
+
 	public void processUnsubmitted() {
 		// Submission process phase 1
 		// 1. Establish submission object, get ID
@@ -813,7 +812,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 				Assignment assignment = assignmentService.getAssignment(entityManager.newReference(item.getTaskId()));
 				Date assignmentDueDate = null;
 				String reportGenSpeed = null;
-				if(assignment != null) {
+				if (assignment != null) {
 					assignmentDueDate = Date.from(assignment. getDueDate());					
 					reportGenSpeed = assignment.getProperties().get("report_gen_speed");
 					// If report gen speed is set to due date, and it's before the due date right now, do not process item
@@ -970,7 +969,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 						default:
 							log.info("Unknown submission status, will retry: " + submissionStatus);
 						}
-						if(StringUtils.isNotEmpty(errorStr)) {
+						if (StringUtils.isNotEmpty(errorStr)) {
 							item.setLastError(errorStr);
 							item.setStatus(ContentReviewConstants.CONTENT_REVIEW_SUBMISSION_ERROR_NO_RETRY_CODE);
 							crqs.update(item);
@@ -990,7 +989,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		}		
 		log.info("Turnitin submission queue completed: " + success + " items submitted, " + errors + " errors.");		
 	}
-	
+
 	private Date getDueDateRetryTime(Date dueDate) {
 		// Set retry time to every 4 hours
 		Calendar cal = Calendar.getInstance();
@@ -1023,7 +1022,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		placeholderItem.setTaskId(item.getTaskId());																	
 		crqs.update(placeholderItem);
 	}			
-	
+
 	public boolean incrementItem(ContentReviewItem item) {
 		// If retry count is null set to 0
 		Calendar cal = Calendar.getInstance();
@@ -1051,7 +1050,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	public int getDelayTime(long retries) {
 		// exponential retry algorithm that caps the retries off at 36 hours (checking once every 4 hours max)
 		int minutes = (int) Math.pow(2, retries < TURNITIN_MAX_RETRY ? retries : 1); // built in check for max retries
-																						// to fail quicker
+		// to fail quicker
 		return minutes > TURNITIN_OC_MAX_RETRY_MINUTES ? TURNITIN_OC_MAX_RETRY_MINUTES : minutes;
 	}
 
@@ -1090,7 +1089,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	}
 
 	private void uploadExternalContent(String reportId, byte[] data) throws Exception {
-		
+
 		HashMap<String, Object> response = makeHttpCall("PUT",
 				getNormalizedServiceUrl() + "submissions/" + reportId + "/original/",
 				CONTENT_UPLOAD_HEADERS,
@@ -1111,7 +1110,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		Optional<ContentReviewItem> cri = crqs.getQueuedItem(getProviderId(), contentId);
 		return cri.isPresent() ? cri.get() : null;
 	}
-	
+
 	@Override
 	public String getEndUserLicenseAgreementLink() {
 		return "https://www.vericite.com";
@@ -1126,7 +1125,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 	public String getEndUserLicenseAgreementVersion() {
 		return "1.1";
 	}
-	
+
 	@Override
 	public void webhookEvent(HttpServletRequest request, String providerName, Optional<String> customParam) {
 		log.info("providerName: " + providerName + ", custom: " + (customParam.isPresent() ? customParam.get() : ""));
@@ -1160,7 +1159,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		body = stringBuilder.toString();
 		log.info(body);
 	}
-	
+
 	@Getter
 	@AllArgsConstructor
 	private class Webhook {
