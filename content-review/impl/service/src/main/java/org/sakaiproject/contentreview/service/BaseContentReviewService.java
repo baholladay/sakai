@@ -1,7 +1,6 @@
 package org.sakaiproject.contentreview.service;
 
 import java.time.Instant;
-import java.util.Calendar;
 import java.util.Optional;
 
 import org.apache.commons.lang.StringUtils;
@@ -115,19 +114,8 @@ public abstract class BaseContentReviewService implements ContentReviewService{
 	
 	private void checkContentItemStatus(String contentId) throws ReportException {
 		ContentReviewItem item = getContentReviewItemByContentId(contentId);
-		if (item == null
+		if(item == null
 				|| !ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_REPORT_AVAILABLE_CODE.equals(item.getStatus())) {
-			if (item != null && ContentReviewConstants.CONTENT_REVIEW_SUBMISSION_ERROR_RETRY_EXCEEDED_CODE.equals(item.getStatus())) {
-				if (StringUtils.isEmpty(item.getExternalId())) {
-					item.setStatus((long) 1);
-				} else {
-					item.setStatus((long) 4);
-				}
-
-				item.setRetryCount((long) 0);
-				item.setLastError(null);
-				item.setNextRetryTime(Calendar.getInstance().getTime());
-			}
 			throw new ReportException("Report status: " + (item != null ? item.getStatus() : ""));
 		}
 	}

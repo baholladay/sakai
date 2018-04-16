@@ -425,10 +425,21 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 
 	public int getReviewScore(String contentId, String assignmentRef, String userId)
 			throws QueueException, ReportException, Exception {
+		log.info("GET REVIEW SCORE");
 		return crqs.getReviewScore(getProviderId(), contentId);
+	}
+	
+	private void checkContentItemStatus(String contentId) throws ReportException {
+		log.info("GET CONTENT ITEM STATUS");
+		ContentReviewItem item = getContentReviewItemByContentId(contentId);
+		if(item == null
+				|| !ContentReviewConstants.CONTENT_REVIEW_SUBMITTED_REPORT_AVAILABLE_CODE.equals(item.getStatus())) {
+			throw new ReportException("Report status: " + (item != null ? item.getStatus() : ""));
+		}
 	}
 
 	public Long getReviewStatus(String contentId) throws QueueException {
+		log.info("GET REVIEW STATUS");
 		return crqs.getReviewStatus(getProviderId(), contentId);
 	}
 
