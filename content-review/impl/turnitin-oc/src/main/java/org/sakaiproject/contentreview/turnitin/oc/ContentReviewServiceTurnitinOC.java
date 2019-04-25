@@ -208,7 +208,6 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			".html",
 			".wpd",
 			".odt",
-			".hwp",
 			".txt"
 	};
 	private final String[] DEFAULT_ACCEPTABLE_MIME_TYPES = new String[] {
@@ -236,7 +235,6 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 			"text/html",
 			"application/wordperfect",
 			"application/vnd.oasis.opendocument.text",
-			"application/x-hwp",
 			"text/plain"
 	};
 
@@ -257,7 +255,7 @@ public class ContentReviewServiceTurnitinOC extends BaseContentReviewService {
 		serviceUrl = serverConfigurationService.getString("turnitin.oc.serviceUrl", "");
 		apiKey = serverConfigurationService.getString("turnitin.oc.apiKey", "");
 		// Retrieve Sakai Version if null set default 		
-		sakaiVersion = Optional.ofNullable(serverConfigurationService.getString("version.sakai", "")).orElse("UNKNOWN");		
+		sakaiVersion = serverConfigurationService.getString("version.sakai", "UNKNOWN");
 
 		// Populate base headers that are needed for all calls to TCA
 		BASE_HEADERS.put(HEADER_NAME, INTEGRATION_FAMILY);
